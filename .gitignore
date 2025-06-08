@@ -17,11 +17,17 @@ node_modules/
 .env.test.local
 .env.production.local
 
-# Database
-/data/*.db
-/data/*.db-journal
+# Database files (SQLite)
+*.db
+*.db-journal
 *.sqlite
 *.sqlite3
+backend/data/*.db
+backend/data/*.db-journal
+data/*.db
+data/*.db-journal
+/data/*.db
+/data/*.db-journal
 
 # Logs
 logs
@@ -52,9 +58,11 @@ pids
 # Debug
 .debug
 
-# Prisma
+# Prisma generated files
 /prisma/*.db
 /prisma/*.db-journal
+backend/prisma/*.db
+backend/prisma/*.db-journal
 
 # Misc
 .DS_Store
