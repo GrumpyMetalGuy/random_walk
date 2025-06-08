@@ -3,8 +3,13 @@ node_modules/
 /.pnp
 .pnp.js
 
-# Testing
+# Testing and Coverage
 /coverage
+coverage/
+*/coverage/
+backend/coverage/
+frontend/coverage/
+*.lcov
 
 # Production
 /build
