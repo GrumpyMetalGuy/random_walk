@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"  # Using nginx to serve static files
+    environment:
+      - VITE_API_URL=http://localhost:4000  # Update this for production
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+    volumes:
+      - random-walk_data:/app/data  # Named volume for persistence
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=file:/app/data/random-walk.db
+      - PORT=4000
+      - CORS_ORIGIN=http://localhost:3000  # Update this for production
+    restart: unless-stopped
+
+volumes:
+  random-walk_data:  # Define named volume for data persistence 
