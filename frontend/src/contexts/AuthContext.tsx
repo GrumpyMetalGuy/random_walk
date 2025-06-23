@@ -1,10 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-
-const API_URL = (import.meta as any).env.VITE_API_URL || 'http://localhost:4000';
-
-// Configure axios to include credentials
-axios.defaults.withCredentials = true;
 
 export interface User {
   id: number;
@@ -22,8 +18,9 @@ export interface AuthContextType {
   login: (username: string, password: string, rememberMe?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   register: (username: string, password: string, role?: 'ADMIN' | 'USER') => Promise<void>;
-  setupAdmin: (username: string, password: string) => Promise<void>;
+  setupAdmin: (username: string, password: string, distanceUnit?: 'miles' | 'kilometers', searchRanges?: number[]) => Promise<void>;
   checkSetupRequired: () => Promise<void>;
+  checkAuth: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -44,6 +41,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [setupRequired, setSetupRequired] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const isAuthenticated = !!user;
 
@@ -54,7 +53,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const checkAuth = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/auth/me`);
+      const response = await axios.get('/api/auth/me');
       if (response.data.success) {
         setUser(response.data.user);
         setSetupRequired(false);
@@ -69,7 +68,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const checkSetupRequired = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/auth/setup-required`);
+      const response = await axios.get('/api/auth/setup-required');
       setSetupRequired(response.data.setupRequired);
     } catch (error) {
       console.error('Failed to check setup status:', error);
@@ -79,7 +78,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (username: string, password: string, rememberMe = false) => {
     try {
-      const response = await axios.post(`${API_URL}/api/auth/login`, {
+      const response = await axios.post('/api/auth/login', {
         username,
         password,
         rememberMe
@@ -94,6 +93,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           localStorage.setItem('token', response.data.token);
           axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
         }
+
+        // Navigate to appropriate page after login
+        const currentPath = location.pathname;
+        const user = response.data.user;
+        
+        // If user is on admin page but not an admin, redirect to home
+        if (currentPath === '/admin' && user.role !== 'ADMIN') {
+          navigate('/', { replace: true });
+        }
+        // If user is a regular user and on any admin-only route, redirect to home
+        else if (user.role !== 'ADMIN' && currentPath.startsWith('/admin')) {
+          navigate('/', { replace: true });
+        }
+        // For admins or users on valid routes, stay where they are
+        
       } else {
         throw new Error(response.data.error || 'Login failed');
       }
@@ -107,7 +121,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async () => {
     try {
-      await axios.post(`${API_URL}/api/auth/logout`);
+      await axios.post('/api/auth/logout');
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
@@ -119,7 +133,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const register = async (username: string, password: string, role: 'ADMIN' | 'USER' = 'USER') => {
     try {
-      const response = await axios.post(`${API_URL}/api/auth/register`, {
+      const response = await axios.post('/api/auth/register', {
         username,
         password,
         role
@@ -136,11 +150,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const setupAdmin = async (username: string, password: string) => {
+  const setupAdmin = async (username: string, password: string, distanceUnit: 'miles' | 'kilometers' = 'miles', searchRanges?: number[]) => {
     try {
-      const response = await axios.post(`${API_URL}/api/auth/setup`, {
+      const response = await axios.post('/api/auth/setup', {
         username,
-        password
+        password,
+        distanceUnit,
+        searchRanges
       });
 
       if (response.data.success) {
@@ -193,7 +209,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logout,
     register,
     setupAdmin,
-    checkSetupRequired
+    checkSetupRequired,
+    checkAuth
   };
 
   return (

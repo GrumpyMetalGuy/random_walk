@@ -3,6 +3,8 @@
 ## Overview
 Random Walk is a secure web application that helps users discover and track interesting places to visit around their home location through randomly generated walking routes. It features individual user accounts with role-based access control, uses OpenStreetMap data to find places, and allows users to plan and track their visits while encouraging exploration through random walks.
 
+**Architecture**: The application runs as a single service where the Express backend serves both the API endpoints and the React frontend.
+
 ## Core Features
 
 ### Authentication & User Management
@@ -103,7 +105,7 @@ Random Walk is a secure web application that helps users discover and track inte
 - **Role-Based Middleware**: Route-level authorization checks
 - **Input Validation**: Zod schemas for all user inputs
 - **Rate Limiting**: Protection against brute force attacks
-- **CORS Configuration**: Secure cross-origin requests with credentials
+- **Same-Origin Security**: Frontend and backend served from same origin
 
 ## Default Configuration
 
@@ -176,7 +178,7 @@ Key types include:
 - **JWT token security** with proper expiration and HTTP-only cookies
 - **Input validation** and sanitization for all user inputs
 - **Rate limiting** for authentication endpoints
-- **CORS protection** with credential support
+- **Same-origin security** (no CORS needed)
 - **Database security** with Prisma ORM parameterized queries
 - **Password requirements** enforced for security (20+ characters)
 
@@ -203,8 +205,8 @@ Key types include:
 - Security-first development approach
 
 ## Testing Strategy
-- Unit tests for core functionality
-- Integration tests for API endpoints
+- **Frontend**: Vitest with React Testing Library for component and integration tests
+- **Backend**: Jest for unit tests, integration tests, and API endpoint testing
 - **Authentication and authorization tests**
 - **Security testing** for JWT tokens and password hashing
 - E2E tests for critical user journeys including setup flow

@@ -1,16 +1,27 @@
-import { prismaMock } from '../../test/setup';
+import { prismaMock } from '../../test/setup.js';
 import request from 'supertest';
-import { app } from '../../app';
+import { app } from '../../app.js';
 import { Setting } from '@prisma/client';
-import * as geocoding from '../../services/geocoding';
+import * as geocoding from '../../services/geocoding.js';
+import { AuthService } from '../../services/auth.js';
 
 // Mock the geocoding module
 jest.mock('../../services/geocoding');
 const mockGeocodeAddress = geocoding.geocodeAddress as jest.Mock;
 
 describe('Settings API', () => {
+  let authToken: string;
+
   beforeEach(() => {
     mockGeocodeAddress.mockClear();
+    
+    // Create a test token for authentication (admin required for settings)
+    const testUser = {
+      userId: 1,
+      username: 'testadmin',
+      role: 'ADMIN'
+    };
+    authToken = AuthService.generateToken(testUser);
   });
 
   const mockSetting: Setting = {
@@ -22,14 +33,7 @@ describe('Settings API', () => {
 
   describe('PUT /', () => {
     it('should store country code when setting home address', async () => {
-      // Mock first geocoding call to get country
-      mockGeocodeAddress.mockResolvedValueOnce({
-        lat: 51.0000,
-        lon: 0.0000,
-        country_code: 'fr'
-      });
-
-      // Mock second geocoding call with country code
+      // Mock geocoding call to return address with country code
       mockGeocodeAddress.mockResolvedValueOnce({
         lat: 51.0000,
         lon: 0.0000,
@@ -37,30 +41,47 @@ describe('Settings API', () => {
       });
 
       // Mock the database calls
-      prismaMock.setting.upsert.mockResolvedValueOnce(mockSetting)  // For home_address
-        .mockResolvedValueOnce({  // For country_code
-          key: 'country_code',
-          value: 'fr',
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
+      prismaMock.setting.upsert.mockResolvedValueOnce({  // For country_code
+        key: 'country_code',
+        value: 'fr',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .mockResolvedValueOnce({  // For home_coordinates
+        key: 'home_coordinates',
+        value: '51,0',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .mockResolvedValueOnce(mockSetting);  // For home_address
 
       const response = await request(app)
         .put('/api/settings')
+        .set('Authorization', `Bearer ${authToken}`)
         .send({
           key: 'home_address',
           value: '123 Test Street, Paris, France'
         });
 
       expect(response.status).toBe(200);
-      expect(mockGeocodeAddress).toHaveBeenCalledTimes(2);
+      expect(mockGeocodeAddress).toHaveBeenCalledTimes(1);
       expect(mockGeocodeAddress).toHaveBeenCalledWith('123 Test Street, Paris, France');
-      expect(mockGeocodeAddress).toHaveBeenCalledWith('123 Test Street, Paris, France', 'fr');
+      
+      // Verify country code was stored
       expect(prismaMock.setting.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { key: 'country_code' },
           create: { key: 'country_code', value: 'fr' },
           update: { value: 'fr' }
+        })
+      );
+      
+      // Verify coordinates were stored
+      expect(prismaMock.setting.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { key: 'home_coordinates' },
+          create: { key: 'home_coordinates', value: '51,0' },
+          update: { value: '51,0' }
         })
       );
     });
@@ -70,6 +91,7 @@ describe('Settings API', () => {
 
       const response = await request(app)
         .put('/api/settings')
+        .set('Authorization', `Bearer ${authToken}`)
         .send({
           key: 'home_address',
           value: 'Invalid Address'
@@ -85,6 +107,7 @@ describe('Settings API', () => {
 
       const response = await request(app)
         .put('/api/settings')
+        .set('Authorization', `Bearer ${authToken}`)
         .send({
           key: 'home_address',
           value: 'Test Address'

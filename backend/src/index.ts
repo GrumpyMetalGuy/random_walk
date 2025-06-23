@@ -1,34 +1,37 @@
-import express from 'express';
-import cors from 'cors';
-import { rateLimit } from 'express-rate-limit';
-import { placesRouter } from './routes/places';
-import { settingsRouter } from './routes/settings';
-import { locationRouter } from './routes/location';
+import { app } from './app.js';
+import { DatabaseService } from './services/database.js';
 
-const app = express();
-const port = process.env.PORT || 4000;
+const port = 4000; // Hardcoded - users should use Docker port mapping to change external port
 
-// Middleware
-app.use(express.json());
-app.use(cors());  // Allow all origins in development
+async function startServer() {
+  try {
+    // Initialize database before starting the server
+    await DatabaseService.initialize();
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
-});
-app.use(limiter);
+    // Bind to all interfaces (0.0.0.0) for Docker compatibility
+    app.listen(port, '0.0.0.0', () => {
+      console.log(`🚀 Server running at http://localhost:${port}`);
+      console.log(`📊 Health check: http://localhost:${port}/health`);
+    });
 
-// Routes
-app.use('/api/places', placesRouter);
-app.use('/api/settings', settingsRouter);
-app.use('/api/location', locationRouter);
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
+}
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('🛑 Received SIGTERM, shutting down gracefully...');
+  await DatabaseService.disconnect();
+  process.exit(0);
 });
 
-app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
-}); 
+process.on('SIGINT', async () => {
+  console.log('🛑 Received SIGINT, shutting down gracefully...');
+  await DatabaseService.disconnect();
+  process.exit(0);
+});
+
+// Start the server
+startServer(); 

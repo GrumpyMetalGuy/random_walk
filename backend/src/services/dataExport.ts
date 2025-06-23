@@ -73,17 +73,25 @@ export class DataExportService {
 
   static async getDataSummary() {
     try {
-      const [placesCount, settingsCount, usersCount] = await Promise.all([
+      const [placesCount, usersCount, places] = await Promise.all([
         prisma.place.count(),
-        prisma.setting.count(),
-        prisma.user.count()
+        prisma.user.count(),
+        prisma.place.findMany({
+          select: { locationType: true }
+        })
       ]);
+
+      // Count places by category
+      const categoryCounts: { [key: string]: number } = {};
+      places.forEach(place => {
+        const type = place.locationType;
+        categoryCounts[type] = (categoryCounts[type] || 0) + 1;
+      });
 
       return {
         places: placesCount,
-        settings: settingsCount,
         users: usersCount,
-        totalRecords: placesCount + settingsCount + usersCount
+        categoryCounts
       };
     } catch (error) {
       throw new Error('Failed to get data summary');

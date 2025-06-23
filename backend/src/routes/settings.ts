@@ -1,11 +1,15 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
-import { seedPlaces } from '../services/seedService';
-import { geocodeAddress } from '../services/geocoding';
+import { seedPlaces } from '../services/seedService.js';
+import { geocodeAddress } from '../services/geocoding.js';
+import { authenticateToken, AuthenticatedRequest } from '../middleware/auth.js';
 
 const router = Router();
 const prisma = new PrismaClient();
+
+// Require authentication for all settings routes
+router.use(authenticateToken);
 
 const updateSettingSchema = z.object({
   key: z.string(),
@@ -13,7 +17,7 @@ const updateSettingSchema = z.object({
 });
 
 // Get all settings
-router.get('/', async (req, res) => {
+router.get('/', async (req: AuthenticatedRequest, res) => {
   try {
     const settings = await prisma.setting.findMany();
     res.json(settings);
@@ -24,7 +28,7 @@ router.get('/', async (req, res) => {
 });
 
 // Update setting
-router.put('/', async (req, res) => {
+router.put('/', async (req: AuthenticatedRequest, res) => {
   try {
     const { key } = updateSettingSchema.parse(req.body);
     let { value } = updateSettingSchema.parse(req.body);
@@ -45,15 +49,15 @@ router.put('/', async (req, res) => {
         create: { key: 'country_code', value: geoResult.country_code || '' }
       });
 
-      // Now validate with the country code to ensure accuracy
-      const validationResult = await geocodeAddress(value, geoResult.country_code);
-      
-      if (!validationResult) {
-        return res.status(400).json({ error: 'Failed to validate address' });
-      }
+      // Store coordinates separately for calculations (using first geocoding result)
+      await prisma.setting.upsert({
+        where: { key: 'home_coordinates' },
+        update: { value: geoResult.lat + ',' + geoResult.lon },
+        create: { key: 'home_coordinates', value: geoResult.lat + ',' + geoResult.lon }
+      });
 
-      // Use the full display name from OSM for consistency
-      value = validationResult.lat + ',' + validationResult.lon;
+      // Keep the original human-readable address
+      // value remains the original input address
     }
     
     const setting = await prisma.setting.upsert({
@@ -62,10 +66,8 @@ router.put('/', async (req, res) => {
       create: { key, value },
     });
 
-    // If home address was updated, reseed the places
-    if (key === 'home_address') {
-      await seedPlaces();
-    }
+    // Note: Removed automatic place seeding when home address is updated
+    // Place generation is now handled separately via the setup wizard or admin interface
 
     res.json(setting);
   } catch (error) {

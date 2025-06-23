@@ -38,7 +38,7 @@ Random Walk is a secure web application that helps users discover and track inte
 ## Quick Start
 
 1. **Prerequisites**
-   - Docker and Docker Compose
+   - Docker and Docker Compose (or Node.js 18+ for local development)
    - Git
    - Basic terminal knowledge
 
@@ -50,37 +50,69 @@ Random Walk is a secure web application that helps users discover and track inte
 
    # Create environment file
    cat > .env << EOL
-   NODE_ENV=development
+   NODE_ENV=production
    DATABASE_URL=file:/app/data/randomwalk.db
-   CORS_ORIGIN=http://localhost:3000
    PORT=4000
-   VITE_API_URL=http://localhost:4000
-   JWT_SECRET=your-jwt-secret-here-make-it-long-and-random
+   JWT_SECRET=$(openssl rand -base64 32)
    EOL
 
    # Start the application
-   docker-compose up -d
+   docker-compose up
    ```
 
-3. **First-Run Setup**
-   - Frontend: http://localhost:3000
-   - Follow the setup wizard to create your admin account
-   - Complete home location setup
-   - Start discovering places!
+   **✨ Database Auto-Setup**: The application will automatically:
+   - Create the database file if it doesn't exist
+   - Run all necessary migrations
+   - Seed initial data
+   - No manual database setup required!
 
-4. **Access Points**
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:4000
+3. **Access the application**:
+   - **Full Application**: http://localhost:4000
+   - **Health Check**: http://localhost:4000/health
+   - **API Endpoints**: http://localhost:4000/api/*
+
+4. **First-Run Setup**:
+   On your first visit, you'll see a setup screen to create the initial admin account. The database initialization happens automatically - just create your admin user and start using the app!
+
+### Local Development (without Docker)
+```bash
+# Install dependencies
+npm install
+cd frontend && npm install
+cd ../backend && npm install
+
+# Build and start the application
+npm run build && npm start
+```
 
 ## Development
+
+### Project Structure
+```
+random-walk/
+├── frontend/               # React TypeScript frontend
+│   ├── src/               # Source code
+│   ├── vitest.config.ts   # Vitest configuration
+│   └── package.json       # Frontend dependencies
+├── backend/               # Node.js TypeScript backend  
+│   ├── src/               # Source code
+│   ├── data/              # SQLite database location
+│   ├── public/            # Built frontend assets (auto-generated)
+│   ├── prisma/            # Database schema and migrations
+│   ├── jest.config.ts     # Jest configuration
+│   └── package.json       # Backend dependencies
+├── docker-compose*.yml    # Docker configurations
+└── package.json           # Root scripts and coordination
+```
 
 ### Tech Stack
 - **Frontend**: React with TypeScript, Tailwind CSS
 - **Backend**: Node.js with Express, TypeScript
 - **Database**: SQLite with Prisma ORM v6.9.0
 - **Authentication**: JWT with Argon2id password hashing
-- **Testing**: Jest and React Testing Library
+- **Testing**: Vitest (frontend) and Jest (backend) with React Testing Library
 - **Containerization**: Docker
+- **Build System**: Vite (frontend), TypeScript compiler (backend)
 
 ### Running Tests
 ```bash
@@ -96,14 +128,14 @@ npm run test:backend
 
 ### Development Mode
 ```bash
-# Start development servers
+# Start development server (builds frontend first, then starts backend)
 npm run dev
 
-# Start frontend only
-npm run dev:frontend
+# Or if frontend is already built, watch-only mode
+npm run dev:watch
 
-# Start backend only
-npm run dev:backend
+# Or start directly from backend (requires frontend to be pre-built)
+cd backend && npm run dev
 ```
 
 ### Database Management
@@ -140,8 +172,16 @@ cd backend && npx prisma migrate dev --name your-migration-name
 - **20-character minimum passwords** (assuming password manager usage)
 - **Role-based authorization** middleware
 - **Input validation** with Zod schemas
-- **CORS protection** with credential support
+- **Same-origin security** (no CORS needed)
 - **Rate limiting** on authentication endpoints
+
+## User Interface
+
+- **Responsive Design**: Works well on desktop and mobile devices
+- **Dark Mode Support**: Toggle between light and dark themes
+- **Automatic Theme Detection**: On first visit, the app automatically detects and uses your system's color scheme preference (light/dark mode)
+- **Theme Indicator**: A small blue dot appears on the theme toggle when following system preferences
+- **Theme Reset**: Double-click the theme toggle to reset back to system preference if you've manually changed it
 
 ## Production Deployment
 
@@ -184,8 +224,8 @@ For detailed API documentation, please refer to [SPEC.md](SPEC.md).
 ## Testing
 
 The application includes comprehensive test coverage:
-- Unit tests for core functionality
-- Integration tests for API endpoints
+- **Frontend**: Vitest with React Testing Library for component and UI tests
+- **Backend**: Jest for unit tests, API endpoint testing, and integration tests
 - Authentication and authorization tests
 - End-to-end tests for critical user journeys
 - Performance testing
@@ -206,19 +246,17 @@ The application uses the following environment variables:
 ```bash
 NODE_ENV=development
 DATABASE_URL=file:/app/data/randomwalk.db
-CORS_ORIGIN=http://localhost:3000
 PORT=4000
-VITE_API_URL=http://localhost:4000
 JWT_SECRET=your-super-secret-jwt-key-here
+NOMINATIM_EMAIL=your-email@example.com
 ```
 
 ### Production
 ```bash
 NODE_ENV=production
 DATABASE_URL=file:/app/data/randomwalk.db
-CORS_ORIGIN=https://your-domain.com
-VITE_API_URL=https://api.your-domain.com
 JWT_SECRET=your-production-jwt-secret-very-long-and-random
+NOMINATIM_EMAIL=your-email@example.com
 ```
 
 **Important**: Always use a strong, unique `JWT_SECRET` in production. Generate a random 64+ character string.

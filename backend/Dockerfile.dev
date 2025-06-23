@@ -8,6 +8,15 @@ RUN npm install
 
 COPY . .
 
+# Generate Prisma client
+RUN npx prisma generate
+
+# Create data directory with proper permissions and switch to node user first
+RUN mkdir -p /app/data && chown -R node:node /app
+
 EXPOSE 4000
+
+# Switch to non-root user
+USER node
 
 CMD ["npm", "run", "dev"] 

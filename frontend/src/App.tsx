@@ -4,6 +4,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Layout } from './components/Layout';
 import { Home } from './pages/Home';
+import { Places } from './pages/Places';
 import { Admin } from './pages/Admin';
 import './index.css';
 
@@ -19,6 +20,7 @@ export default function App() {
             </ProtectedRoute>
           }>
             <Route index element={<Home />} />
+            <Route path="places" element={<Places />} />
             <Route path="admin" element={
               <ProtectedRoute requireAdmin>
                 <Admin />

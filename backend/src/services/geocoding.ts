@@ -1,4 +1,5 @@
 import fetch from 'node-fetch';
+import { nominatimRateLimiter } from './nominatimRateLimiter.js';
 
 interface GeocodingResult {
   lat: number;
@@ -8,7 +9,11 @@ interface GeocodingResult {
 
 export async function geocodeAddress(address: string, countryCode?: string): Promise<GeocodingResult | null> {
   try {
+    console.log(`Geocoding address: ${address}`);
+    await nominatimRateLimiter.waitForNextRequest();
+    
     const encodedAddress = encodeURIComponent(address);
+    
     const response = await fetch(
       `https://nominatim.openstreetmap.org/search?` +
       `q=${encodedAddress}&` +
@@ -19,12 +24,12 @@ export async function geocodeAddress(address: string, countryCode?: string): Pro
       {
         headers: {
           'User-Agent': 'Random-Walk/1.0',
-        },
+        }
       }
     );
 
     if (!response.ok) {
-      throw new Error('Geocoding request failed');
+      throw new Error(`Geocoding request failed with status: ${response.status}`);
     }
 
     const data = await response.json();
@@ -35,7 +40,7 @@ export async function geocodeAddress(address: string, countryCode?: string): Pro
     }
 
     const result = data[0];
-    console.log('Geocoded location:', result.display_name);
+    console.log('Successfully geocoded to:', result.display_name);
     
     return {
       lat: parseFloat(result.lat),

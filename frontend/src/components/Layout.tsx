@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 export function Layout() {
   console.log('Layout component rendering');
-  const { theme, toggleTheme } = useTheme();
+  const { theme, toggleTheme, isFollowingSystem, resetToSystem } = useTheme();
   const { user, logout } = useAuth();
 
   const handleLogout = async () => {
@@ -12,6 +12,12 @@ export function Layout() {
       await logout();
     } catch (error) {
       console.error('Logout failed:', error);
+    }
+  };
+
+  const handleThemeDoubleClick = () => {
+    if (!isFollowingSystem()) {
+      resetToSystem();
     }
   };
 
@@ -32,6 +38,12 @@ export function Layout() {
                   className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 dark:text-gray-100"
                 >
                   Home
+                </Link>
+                <Link
+                  to="/places"
+                  className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+                >
+                  Places
                 </Link>
                 {user?.role === 'ADMIN' && (
                   <Link
@@ -64,9 +76,25 @@ export function Layout() {
               )}
               <button
                 onClick={toggleTheme}
-                className="p-2 rounded-md text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+                onDoubleClick={handleThemeDoubleClick}
+                className="p-2 rounded-md text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 relative group"
+                title={`Theme: ${theme} ${isFollowingSystem() ? '(following system)' : '(manual)'}`}
               >
-                {theme === 'dark' ? '🌞' : '🌙'}
+                <span className="text-lg">
+                  {theme === 'dark' ? '🌞' : '🌙'}
+                </span>
+                {isFollowingSystem() && (
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full animate-pulse" 
+                        title="Following system theme"></span>
+                )}
+                
+                {/* Tooltip */}
+                <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap">
+                  {isFollowingSystem() 
+                    ? `Auto: ${theme} (system)` 
+                    : `Manual: ${theme} • Double-click to reset to system`
+                  }
+                </div>
               </button>
             </div>
           </div>

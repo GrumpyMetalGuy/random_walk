@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
+import { nominatimRateLimiter } from '../services/nominatimRateLimiter.js';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -19,6 +20,8 @@ router.get('/search', async (req, res) => {
       where: { key: 'country_code' }
     });
 
+    await nominatimRateLimiter.waitForNextRequest();
+
     const searchUrl = new URL('https://nominatim.openstreetmap.org/search');
     searchUrl.searchParams.append('q', query);
     searchUrl.searchParams.append('format', 'json');
@@ -31,7 +34,7 @@ router.get('/search', async (req, res) => {
 
     const response = await fetch(searchUrl.toString(), {
       headers: {
-        'User-Agent': 'PlaceFinder/1.0',
+        'User-Agent': 'RandomWalk/1.0',
       }
     });
     
@@ -61,6 +64,8 @@ router.post('/validate', async (req, res) => {
       where: { key: 'country_code' }
     });
 
+    await nominatimRateLimiter.waitForNextRequest();
+
     const searchUrl = new URL('https://nominatim.openstreetmap.org/search');
     searchUrl.searchParams.append('q', query);
     searchUrl.searchParams.append('format', 'json');
@@ -73,7 +78,7 @@ router.post('/validate', async (req, res) => {
 
     const response = await fetch(searchUrl.toString(), {
       headers: {
-        'User-Agent': 'PlaceFinder/1.0',
+        'User-Agent': 'RandomWalk/1.0',
       }
     });
     

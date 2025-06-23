@@ -19,9 +19,10 @@ CREATE TABLE "places" (
     "longitude" REAL NOT NULL,
     "what3words" TEXT,
     "osmId" TEXT,
-    "isVisited" BOOLEAN NOT NULL DEFAULT false,
+    "visitStatus" TEXT NOT NULL DEFAULT 'AVAILABLE',
     "dateAdded" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "lastVisited" DATETIME,
+    "lastIgnored" DATETIME,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );

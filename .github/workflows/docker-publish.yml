@@ -1,0 +1,90 @@
+name: Build and Publish Docker Image
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Triggers on version tags like v1.0.0
+  workflow_dispatch:  # Allows manual triggering
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: yourusername/random-walk  # Replace with your DockerHub username
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Extract version from package.json
+      id: package-version
+      run: |
+        VERSION=$(node -p "require('./package.json').version")
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Package version: $VERSION"
+
+    - name: Verify git tag matches package.json version
+      run: |
+        PACKAGE_VERSION="${{ steps.package-version.outputs.version }}"
+        GIT_TAG="${GITHUB_REF#refs/tags/v}"
+        echo "Package version: $PACKAGE_VERSION"
+        echo "Git tag version: $GIT_TAG"
+        if [ "$PACKAGE_VERSION" != "$GIT_TAG" ]; then
+          echo "❌ Version mismatch! Package.json version ($PACKAGE_VERSION) doesn't match git tag ($GIT_TAG)"
+          exit 1
+        fi
+        echo "✅ Versions match!"
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login to DockerHub
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=tag
+          type=raw,value=latest
+          type=raw,value=v${{ steps.package-version.outputs.version }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./backend/Dockerfile
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        platforms: linux/amd64,linux/arm64
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Update docker-compose.yml with new version
+      run: |
+        VERSION="${{ steps.package-version.outputs.version }}"
+        sed -i "s|image: yourusername/random-walk:.*|image: yourusername/random-walk:v$VERSION|g" docker-compose.yml
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add docker-compose.yml
+        if git diff --staged --quiet; then
+          echo "No changes to docker-compose.yml"
+        else
+          git commit -m "Update docker-compose.yml to use version v$VERSION [skip ci]"
+          git push origin HEAD:main
+        fi 

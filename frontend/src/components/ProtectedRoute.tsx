@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Login } from '../pages/Login';
-import { Setup } from '../pages/Setup';
+import { SetupWizard } from './SetupWizard';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -12,7 +12,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children, 
   requireAdmin = false 
 }) => {
-  const { user, isLoading, isAuthenticated, setupRequired } = useAuth();
+  const { user, isLoading, isAuthenticated, setupRequired, checkAuth } = useAuth();
 
   // Show loading spinner while checking authentication
   if (isLoading) {
@@ -25,7 +25,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // Show setup page if no users exist
   if (setupRequired) {
-    return <Setup />;
+    return <SetupWizard onComplete={checkAuth} />;
   }
 
   // Show login page if not authenticated

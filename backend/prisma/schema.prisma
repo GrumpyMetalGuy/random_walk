@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -19,20 +20,28 @@ model User {
   @@map("users")
 }
 
+enum VisitStatus {
+  AVAILABLE
+  PLANNED
+  VISITED
+  IGNORED
+}
+
 model Place {
-  id          Int       @id @default(autoincrement())
+  id          Int         @id @default(autoincrement())
   name        String
   description String?
   locationType String
   latitude    Float
   longitude   Float
   what3words  String?
-  osmId       String?  @unique
-  isVisited   Boolean   @default(false)
-  dateAdded   DateTime  @default(now())
+  osmId       String?    @unique
+  visitStatus VisitStatus @default(AVAILABLE)
+  dateAdded   DateTime    @default(now())
   lastVisited DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  lastIgnored DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
   @@map("places")
 }

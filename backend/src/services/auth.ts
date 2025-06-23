@@ -141,4 +141,86 @@ export class AuthService {
       }
     });
   }
+
+  static async getAllUsers() {
+    return await prisma.user.findMany({
+      select: {
+        id: true,
+        username: true,
+        role: true,
+        createdAt: true,
+        lastLoginAt: true
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+  }
+
+  static async updateUser(id: number, updateData: { username?: string; password?: string; role?: 'ADMIN' | 'USER' }) {
+    const user = await prisma.user.findUnique({
+      where: { id }
+    });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Check if username is taken by another user
+    if (updateData.username && updateData.username !== user.username) {
+      const existingUser = await prisma.user.findUnique({
+        where: { username: updateData.username }
+      });
+
+      if (existingUser) {
+        throw new Error('Username already exists');
+      }
+    }
+
+    const data: any = {};
+
+    if (updateData.username) {
+      data.username = updateData.username;
+    }
+
+    if (updateData.password) {
+      const passwordValidation = this.validatePassword(updateData.password);
+      if (!passwordValidation.valid) {
+        throw new Error(passwordValidation.message);
+      }
+      data.passwordHash = await this.hashPassword(updateData.password);
+    }
+
+    if (updateData.role) {
+      data.role = updateData.role;
+    }
+
+    return await prisma.user.update({
+      where: { id },
+      data,
+      select: {
+        id: true,
+        username: true,
+        role: true,
+        createdAt: true,
+        lastLoginAt: true
+      }
+    });
+  }
+
+  static async deleteUser(id: number) {
+    const user = await prisma.user.findUnique({
+      where: { id }
+    });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    await prisma.user.delete({
+      where: { id }
+    });
+
+    return true;
+  }
 } 

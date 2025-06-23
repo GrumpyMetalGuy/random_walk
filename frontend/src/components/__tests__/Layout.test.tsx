@@ -35,6 +35,6 @@ describe('Layout', () => {
   it('renders the footer', () => {
     renderLayout();
     
-    expect(screen.getByText(/© \d{4} PlaceFinder/)).toBeInTheDocument();
+    expect(screen.getByText(/© \d{4} Random Walk/)).toBeInTheDocument();
   });
 }); 

@@ -14,6 +14,9 @@ frontend/coverage/
 # Production
 /build
 /dist
+backend/dist/
+backend/public/
+frontend/dist/
 
 # Environment files
 .env
@@ -29,10 +32,6 @@ frontend/coverage/
 *.sqlite3
 backend/data/*.db
 backend/data/*.db-journal
-data/*.db
-data/*.db-journal
-/data/*.db
-/data/*.db-journal
 
 # Logs
 logs
@@ -68,7 +67,9 @@ pids
 /prisma/*.db-journal
 backend/prisma/*.db
 backend/prisma/*.db-journal
+backend/prisma/data/
 
 # Misc
 .DS_Store
-Thumbs.db 
+Thumbs.db
+cookies.txt 

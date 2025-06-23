@@ -1,9 +1,11 @@
-import express from 'express';
+import { Router } from 'express';
 import { z } from 'zod';
 import { AuthService } from '../services/auth.js';
 import { authenticateToken, requireAdmin, AuthenticatedRequest } from '../middleware/auth.js';
+import { PrismaClient } from '@prisma/client';
 
-const router = express.Router();
+const router = Router();
+const prisma = new PrismaClient();
 
 // Validation schemas
 const loginSchema = z.object({
@@ -15,7 +17,20 @@ const loginSchema = z.object({
 const registerSchema = z.object({
   username: z.string().min(1, 'Username is required').max(50, 'Username too long'),
   password: z.string().min(20, 'Password must be at least 20 characters'),
+  role: z.enum(['ADMIN', 'USER']).optional().default('USER')
+});
+
+const updateUserSchema = z.object({
+  username: z.string().min(1, 'Username is required').max(50, 'Username too long').optional(),
+  password: z.string().min(20, 'Password must be at least 20 characters').optional(),
   role: z.enum(['ADMIN', 'USER']).optional()
+});
+
+const setupSchema = z.object({
+  username: z.string().min(1, 'Username is required'),
+  password: z.string().min(20, 'Password must be at least 20 characters long'),
+  distanceUnit: z.enum(['miles', 'kilometers']).optional().default('miles'),
+  searchRanges: z.array(z.number().min(1).max(200)).optional().default([5, 10, 15, 20, 40])
 });
 
 // POST /api/auth/login
@@ -79,9 +94,24 @@ router.post('/setup', async (req, res) => {
       });
     }
     
-    const { username, password } = registerSchema.parse(req.body);
+    const { username, password, distanceUnit, searchRanges } = setupSchema.parse(req.body);
     
     const user = await AuthService.createUser(username, password, 'ADMIN');
+    
+    // Store the distance unit preference in settings
+    await prisma.setting.upsert({
+      where: { key: 'distance_unit' },
+      update: { value: distanceUnit },
+      create: { key: 'distance_unit', value: distanceUnit }
+    });
+
+    // Store the search ranges in settings
+    const sortedRanges = [...searchRanges].sort((a, b) => a - b);
+    await prisma.setting.upsert({
+      where: { key: 'search_ranges' },
+      update: { value: JSON.stringify(sortedRanges) },
+      create: { key: 'search_ranges', value: JSON.stringify(sortedRanges) }
+    });
     
     res.status(201).json({
       success: true,
@@ -137,6 +167,90 @@ router.get('/setup-required', async (req, res) => {
   } catch (error) {
     res.status(500).json({
       error: 'Failed to check setup status'
+    });
+  }
+});
+
+// GET /api/auth/users - Get all users (admin only)
+router.get('/users', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const users = await AuthService.getAllUsers();
+    res.json({
+      success: true,
+      users
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get users'
+    });
+  }
+});
+
+// PUT /api/auth/users/:id - Update user (admin only)
+router.put('/users/:id', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    if (isNaN(userId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid user ID'
+      });
+    }
+
+    const updateData = updateUserSchema.parse(req.body);
+    
+    // Prevent admins from demoting themselves
+    if (req.user?.userId === userId && updateData.role === 'USER') {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot change your own role from ADMIN to USER'
+      });
+    }
+    
+    const updatedUser = await AuthService.updateUser(userId, updateData);
+    
+    res.json({
+      success: true,
+      user: updatedUser
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update user'
+    });
+  }
+});
+
+// DELETE /api/auth/users/:id - Delete user (admin only)
+router.delete('/users/:id', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    if (isNaN(userId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid user ID'
+      });
+    }
+
+    // Prevent admins from deleting themselves
+    if (req.user?.userId === userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot delete your own account'
+      });
+    }
+
+    await AuthService.deleteUser(userId);
+    
+    res.json({
+      success: true,
+      message: 'User deleted successfully'
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to delete user'
     });
   }
 });

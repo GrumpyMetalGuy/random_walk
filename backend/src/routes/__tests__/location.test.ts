@@ -1,14 +1,25 @@
-import { prismaMock } from '../../test/setup';
+import { prismaMock } from '../../test/setup.js';
 import request from 'supertest';
-import { app } from '../../app';
+import { app } from '../../app.js';
+import { AuthService } from '../../services/auth.js';
 
 // Mock fetch
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 describe('Location API', () => {
+  let authToken: string;
+
   beforeEach(() => {
     mockFetch.mockClear();
+    
+    // Create a test token for authentication
+    const testUser = {
+      userId: 1,
+      username: 'testuser',
+      role: 'USER'
+    };
+    authToken = AuthService.generateToken(testUser);
   });
 
   describe('GET /api/location/search', () => {
@@ -29,6 +40,7 @@ describe('Location API', () => {
 
       const response = await request(app)
         .get('/api/location/search')
+        .set('Authorization', `Bearer ${authToken}`)
         .query({ query: 'test location' });
 
       expect(response.status).toBe(200);
@@ -50,6 +62,7 @@ describe('Location API', () => {
 
       const response = await request(app)
         .get('/api/location/search')
+        .set('Authorization', `Bearer ${authToken}`)
         .query({ query: 'test location' });
 
       expect(response.status).toBe(200);
@@ -67,6 +80,7 @@ describe('Location API', () => {
 
       const response = await request(app)
         .get('/api/location/search')
+        .set('Authorization', `Bearer ${authToken}`)
         .query({ query: 'test location' });
 
       expect(response.status).toBe(500);
@@ -96,6 +110,7 @@ describe('Location API', () => {
 
       const response = await request(app)
         .post('/api/location/validate')
+        .set('Authorization', `Bearer ${authToken}`)
         .send({ query: 'test location' });
 
       expect(response.status).toBe(200);
@@ -115,6 +130,7 @@ describe('Location API', () => {
 
       const response = await request(app)
         .post('/api/location/validate')
+        .set('Authorization', `Bearer ${authToken}`)
         .send({ query: 'invalid location' });
 
       expect(response.status).toBe(200);
