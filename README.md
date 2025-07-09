@@ -1,5 +1,9 @@
 # Random Walk
 
+LLM-generated project that goes with the article located at https://www.grumpymetalguy.com/programming/random_walk_vibes . Everything below this is LLM generated.
+
+***
+
 Random Walk is a secure web application that helps users discover and track interesting places to visit around their location through randomly generated walking routes. Using OpenStreetMap data, it provides a curated list of places like parks, tourist attractions, towns, and cities, with individual user accounts and role-based access control.
 
 ## Features
