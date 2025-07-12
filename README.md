@@ -42,7 +42,7 @@ Random Walk is a secure web application that helps users discover and track inte
 ## Quick Start
 
 1. **Prerequisites**
-   - Docker and Docker Compose (or Node.js 18+ for local development)
+   - Docker and Docker Compose (or Node.js 20+ for local development)
    - Git
    - Basic terminal knowledge
 

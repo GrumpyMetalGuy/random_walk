@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Docker and Docker Compose installed on your system (or Node.js 18+ for local development)
+- Docker and Docker Compose installed on your system (or Node.js 20+ for local development)
 - Git installed
 - Basic knowledge of terminal/command line operations
 

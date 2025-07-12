@@ -1,4 +1,4 @@
-FROM node:18-alpine AS frontend-builder
+FROM node:20-alpine AS frontend-builder
 
 # Set working directory for frontend build
 WORKDIR /app
@@ -6,7 +6,7 @@ WORKDIR /app
 # Copy frontend package files
 COPY frontend/package*.json ./frontend/
 WORKDIR /app/frontend
-RUN npm ci --only=production --legacy-peer-deps
+RUN npm install --omit=dev --legacy-peer-deps
 
 # Copy frontend source
 COPY frontend/ ./
@@ -14,7 +14,7 @@ COPY frontend/ ./
 # Build frontend (outputs to ../backend/public due to vite.config.ts)
 RUN npm run build
 
-FROM node:18-alpine AS backend-builder
+FROM node:20-alpine AS backend-builder
 
 # Set working directory
 WORKDIR /app
@@ -22,7 +22,7 @@ WORKDIR /app
 # Copy backend package files
 COPY backend/package*.json ./backend/
 WORKDIR /app/backend
-RUN npm ci --legacy-peer-deps
+RUN npm install --legacy-peer-deps
 
 # Copy backend source
 COPY backend/ ./
@@ -36,7 +36,7 @@ RUN npx tsc
 # Copy built frontend from previous stage (Vite builds to ../backend/public)
 COPY --from=frontend-builder /app/backend/public ./public
 
-FROM node:18-alpine AS production
+FROM node:20-alpine AS production
 
 # Install openssl for JWT secret generation
 RUN apk add --no-cache openssl
@@ -46,7 +46,7 @@ WORKDIR /app
 
 # Copy backend package files and install production dependencies
 COPY backend/package*.json ./
-RUN npm ci --only=production --legacy-peer-deps && npm cache clean --force
+RUN npm install --omit=dev --legacy-peer-deps && npm cache clean --force
 
 # Copy prisma directory first (needed for generate)
 COPY --from=backend-builder /app/backend/prisma ./prisma

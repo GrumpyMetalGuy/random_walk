@@ -143,7 +143,7 @@ export function Home() {
     setPlaces(places => places.filter(p => p.visitStatus !== 'AVAILABLE'));
     
     // Set up progress timeouts that we can cancel if request completes quickly
-    const progressTimeouts: NodeJS.Timeout[] = [];
+    const progressTimeouts: number[] = [];
     
     try {
       // Only show progress updates if request takes time
