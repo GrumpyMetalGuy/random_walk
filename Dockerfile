@@ -6,7 +6,7 @@ WORKDIR /app
 # Copy frontend package files
 COPY frontend/package*.json ./frontend/
 WORKDIR /app/frontend
-RUN npm install --omit=dev --legacy-peer-deps
+RUN npm install --legacy-peer-deps
 
 # Copy frontend source
 COPY frontend/ ./
