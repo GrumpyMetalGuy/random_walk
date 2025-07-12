@@ -2,6 +2,10 @@ version: '3.8'
 
 services:
   app:
+    # Option 1: Build locally (uncomment to build from source)
+    # build: .
+    # image: random_walk:latest  # Specify image name for local build
+    # Option 2: Use pre-built image (default)
     image: yourusername/random-walk:v1.0.0  # Replace with your DockerHub username
     ports:
       - "4000:4000"

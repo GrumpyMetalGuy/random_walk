@@ -16,7 +16,7 @@
     "lint:frontend": "cd frontend && npm run lint",
     "lint:backend": "cd backend && npm run lint",
     "docker:build": "npm run docker:build:only",
-    "docker:build:only": "docker build -f backend/Dockerfile -t yourusername/random-walk:v$(node -p require('./package.json').version) -t yourusername/random-walk:latest .",
+    "docker:build:only": "docker build -t yourusername/random-walk:v$(node -p require('./package.json').version) -t yourusername/random-walk:latest .",
     "docker:push": "npm run docker:push:versioned && npm run docker:push:latest",
     "docker:push:versioned": "docker push yourusername/random-walk:v$(node -p require('./package.json').version)",
     "docker:push:latest": "docker push yourusername/random-walk:latest",
