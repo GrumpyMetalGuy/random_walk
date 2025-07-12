@@ -6,7 +6,7 @@ WORKDIR /app
 # Copy frontend package files
 COPY frontend/package*.json ./frontend/
 WORKDIR /app/frontend
-RUN npm ci --only=production
+RUN npm ci --only=production --legacy-peer-deps
 
 # Copy frontend source
 COPY frontend/ ./
@@ -22,7 +22,7 @@ WORKDIR /app
 # Copy backend package files
 COPY backend/package*.json ./backend/
 WORKDIR /app/backend
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # Copy backend source
 COPY backend/ ./
@@ -46,7 +46,7 @@ WORKDIR /app
 
 # Copy backend package files and install production dependencies
 COPY backend/package*.json ./
-RUN npm ci --only=production && npm cache clean --force
+RUN npm ci --only=production --legacy-peer-deps && npm cache clean --force
 
 # Copy prisma directory first (needed for generate)
 COPY --from=backend-builder /app/backend/prisma ./prisma
