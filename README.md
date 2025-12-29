@@ -191,6 +191,43 @@ cd backend && npx prisma migrate dev --name your-migration-name
 
 For production deployment instructions and configuration, please refer to [INSTALL.md](INSTALL.md).
 
+## JWT secret in production
+
+- Always set a fixed `JWT_SECRET` in production to keep tokens valid across restarts and across multiple instances.
+- The container will auto-generate a secret if none is provided (useful for local testing), but this will invalidate sessions on restart and prevents horizontal scaling.
+
+How to set:
+
+- Docker Compose
+  ```yaml
+  services:
+    app:
+      environment:
+        - JWT_SECRET=${JWT_SECRET}
+  ```
+  `.env`:
+  ```env
+  JWT_SECRET=$(openssl rand -base64 64)
+  ```
+
+- Docker run
+  ```bash
+  docker run -d -p 4000:4000 \
+    -e JWT_SECRET="$(openssl rand -base64 64)" \
+    -v random-walk_data:/app/data \
+    random-walk:latest
+  ```
+
+- Kubernetes
+  ```yaml
+  env:
+    - name: JWT_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: random-walk-secrets
+          key: jwt-secret
+  ```
+
 ## API Documentation
 
 The application provides several API endpoints for authentication, places, settings, and user management:

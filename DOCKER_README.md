@@ -44,8 +44,6 @@ volumes:
   random-walk_data:
 ```
 
-**Note**: No environment variables needed! The container is fully self-contained with secure defaults.
-
 ## Data Persistence
 
 Data is stored in `/app/data/randomwalk.db` inside the container. Mount a volume to persist data across container restarts.
@@ -56,11 +54,46 @@ The application includes a health check endpoint at `/health` that returns `{"st
 
 ## Security
 
-- **JWT Secret**: Container auto-generates one if not provided, but **always set your own in production**
-- Generate strong JWT secret: `openssl rand -base64 64`
+- **JWT Secret (required in production)**  
+  - The container will auto-generate a secret if not provided (good for quick tests).  
+  - In production, set a fixed `JWT_SECRET` so tokens remain valid across restarts and replicas.  
+  - Generate a strong secret: `openssl rand -base64 64`
+
+  Docker Compose:
+  ```yaml
+  services:
+    app:
+      environment:
+        - JWT_SECRET=${JWT_SECRET}
+  ```
+  `.env`:
+  ```env
+  JWT_SECRET=$(openssl rand -base64 64)
+  ```
+
+  Docker run:
+  ```bash
+  docker run -d \
+    --name random-walk \
+    -p 4000:4000 \
+    -e JWT_SECRET="$(openssl rand -base64 64)" \
+    -v random-walk_data:/app/data \
+    yourusername/random-walk:latest
+  ```
+
+  Kubernetes:
+  ```yaml
+  env:
+    - name: JWT_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: random-walk-secrets
+          key: jwt-secret
+  ```
+
 - Use HTTPS in production
 - Set strong admin passwords (20+ characters)
 
 ## Source Code
 
-Full source code and documentation: [GitHub Repository URL] 
+Full source code and documentation: <https://github.com/GrumpyMetalGuy/random_walk>

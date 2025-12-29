@@ -209,9 +209,41 @@ certbot --nginx -d your-domain.com
 ## Security Considerations
 
 ### JWT Secret Management
-- **Automatically managed** - JWT secrets are auto-generated securely
-- **No user configuration needed** - Secrets are unique per container instance
-- **Production ready** - Uses 64-character cryptographically secure random secrets
+- **Required in production**: Set a fixed `JWT_SECRET` so tokens remain valid across restarts and replicas.
+- The container will auto-generate a secret if not provided (good for local tests), but this will invalidate all sessions on restart and prevents horizontal scaling.
+- Use a long, random value (64+ bytes, base64-encoded). Example: `openssl rand -base64 64`
+
+How to set:
+
+1) Docker Compose (recommended)
+```yaml
+services:
+  app:
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
+```
+Create a `.env` file next to your compose file:
+```env
+JWT_SECRET=$(openssl rand -base64 64)
+```
+
+2) Docker run
+```bash
+docker run -d -p 4000:4000 \
+  -e JWT_SECRET="$(openssl rand -base64 64)" \
+  -v random-walk_data:/app/data \
+  yourusername/random-walk:latest
+```
+
+3) Kubernetes (example)
+```yaml
+env:
+  - name: JWT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: random-walk-secrets
+        key: jwt-secret
+```
 
 ### Database Security
 - Ensure proper file permissions on the SQLite database
