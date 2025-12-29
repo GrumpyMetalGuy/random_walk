@@ -14,6 +14,8 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
     confirmPassword: ''
   });
   const [address, setAddress] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactUrl, setContactUrl] = useState('');
   const [distanceUnit, setDistanceUnit] = useState<'miles' | 'kilometers'>('miles');
   const [searchRanges, setSearchRanges] = useState<number[]>([5, 10, 15, 20, 40]);
   const [loading, setLoading] = useState(false);
@@ -45,11 +47,35 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
     }
   };
 
-  const handleStep2Submit = (e: React.FormEvent) => {
+  const handleStep2Submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (address.trim()) {
-      setError(null);
+    setError(null);
+    // Basic email validation
+    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim());
+    if (!address.trim()) {
+      setError('Home address is required');
+      return;
+    }
+    if (!emailValid) {
+      setError('Please enter a valid contact email for OpenStreetMap/Nominatim');
+      return;
+    }
+    try {
+      // Save Nominatim contact settings BEFORE geocoding happens in later steps
+      await axios.put(`/api/settings`, {
+        key: 'nominatim_contact_email',
+        value: contactEmail.trim(),
+      });
+      if (contactUrl.trim()) {
+        await axios.put(`/api/settings`, {
+          key: 'nominatim_contact_url',
+          value: contactUrl.trim(),
+        });
+      }
       setStep(3);
+    } catch (err) {
+      console.error('Failed to save Nominatim contact settings:', err);
+      setError('Failed to save OpenStreetMap contact details. Please try again.');
     }
   };
 
@@ -379,6 +405,41 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
                   This will be used as the center point for finding places around you.
                 </p>
               </div>
+              <div className="mt-4">
+                <label htmlFor="contactEmail" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  OpenStreetMap Contact Email (required)
+                </label>
+                <input
+                  id="contactEmail"
+                  name="contactEmail"
+                  type="email"
+                  required
+                  className="input-primary rounded-md"
+                  placeholder="admin@example.com"
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Required by Nominatim usage policy to identify your application.
+                </p>
+              </div>
+              <div className="mt-4">
+                <label htmlFor="contactUrl" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Contact Website (optional)
+                </label>
+                <input
+                  id="contactUrl"
+                  name="contactUrl"
+                  type="url"
+                  className="input-primary rounded-md"
+                  placeholder="https://your-site.example.com"
+                  value={contactUrl}
+                  onChange={(e) => setContactUrl(e.target.value)}
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Used in requests to identify your deployment (optional).
+                </p>
+              </div>
             </div>
 
             {error && (
@@ -397,7 +458,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
               </button>
               <button
                 type="submit"
-                disabled={!address.trim()}
+                disabled={!address.trim() || !contactEmail.trim()}
                 className="btn-primary flex-1"
               >
                 Next: Configure Distances

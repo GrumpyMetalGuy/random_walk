@@ -47,7 +47,36 @@ export function Home() {
   const [distances, setDistances] = useState<number[]>([5, 10, 15, 20, 40]); // Default fallback in miles
   const [distanceUnit, setDistanceUnit] = useState<DistanceUnit>('miles');
 
-  const categories = ['TOWN', 'CITY', 'TOURIST_ATTRACTION', 'PARK', 'PLAYGROUND'];
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  // Load categories from backend so UI reflects configured categories
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        const res = await axios.get(`/api/categories`);
+        // Expect shape: { success: true, categories: [{ type, filters, enabled }] }
+        const types: string[] = Array.isArray(res.data?.categories)
+          ? res.data.categories
+              .filter((c: any) => c && c.enabled && typeof c.type === 'string')
+              .map((c: any) => c.type)
+          : [];
+        if (isMounted) {
+          // Fallback to defaults if empty to avoid blank UI
+          setAvailableCategories(
+            types.length > 0
+              ? types
+              : ['TOWN', 'CITY', 'TOURIST_ATTRACTION', 'PARK', 'PLAYGROUND']
+          );
+        }
+      } catch (e) {
+        // On error, use defaults
+        if (isMounted) {
+          setAvailableCategories(['TOWN', 'CITY', 'TOURIST_ATTRACTION', 'PARK', 'PLAYGROUND']);
+        }
+      }
+    })();
+    return () => { isMounted = false; };
+  }, []);
 
   // Helper functions for places count controls
   const incrementPlacesCount = () => {
@@ -159,7 +188,7 @@ export function Home() {
       
       const response = await axios.post(`/api/places/discover`, {
         distance: distanceInMiles,
-        categories: selectedCategories.length > 0 ? selectedCategories : categories,
+        categories: selectedCategories.length > 0 ? selectedCategories : availableCategories,
         count: selectedPlacesCount,
         textFilter: textFilter.trim() || undefined,
       });
@@ -441,7 +470,7 @@ export function Home() {
           <div>
             <label className="block text-sm font-medium mb-2">Categories (optional)</label>
             <div className="space-y-2">
-              {categories.map(category => (
+              {availableCategories.map(category => (
                 <label key={category} className="flex items-center">
                   <input
                     type="checkbox"

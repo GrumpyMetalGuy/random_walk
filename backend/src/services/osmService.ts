@@ -5,6 +5,35 @@ import { nominatimRateLimiter } from './nominatimRateLimiter.js';
 
 const prisma = new PrismaClient();
 
+async function getNominatimHeaders(): Promise<Record<string, string>> {
+  const settings = await prisma.setting.findMany({
+    where: {
+      key: { in: ['nominatim_contact_email', 'nominatim_contact_url', 'app_name'] }
+    }
+  });
+  const get = (k: string) => settings.find(s => s.key === k)?.value?.trim();
+  const contactEmail = get('nominatim_contact_email');
+  const contactUrl = get('nominatim_contact_url');
+  const appName = get('app_name') || 'Random Walk';
+
+  const contactParts: string[] = [];
+  if (contactUrl) contactParts.push(contactUrl);
+  if (contactEmail) contactParts.push(contactEmail);
+  const contactStr = contactParts.length > 0 ? ` (+${contactParts.join('; ')})` : '';
+  const userAgent = `${appName}/1.0${contactStr}`;
+  if (!contactEmail && !contactUrl) {
+    console.warn('Nominatim contact details missing (email/url). Please configure via admin settings to avoid 403 responses.');
+  }
+
+  const headers: Record<string, string> = {
+    'User-Agent': userAgent
+  };
+  if (contactUrl) {
+    headers['Referer'] = contactUrl;
+  }
+  return headers;
+}
+
 interface OverpassElement {
   type: string;
   id: number;
@@ -47,11 +76,8 @@ export async function reverseGeocode(lat: number, lon: number): Promise<{city?: 
   try {
     await nominatimRateLimiter.waitForNextRequest();
     
-    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=16&addressdetails=1`, {
-      headers: {
-        'User-Agent': 'RandomWalk/1.0 (your-email@example.com)', // Nominatim requires User-Agent
-      }
-    });
+    const headers = await getNominatimHeaders();
+    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=16&addressdetails=1`, { headers });
     
     if (!response.ok) {
       if (response.status === 429) {

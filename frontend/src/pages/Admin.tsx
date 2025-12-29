@@ -103,8 +103,42 @@ function CategoryForm({
   };
 
   const updateFilter = (index: number, value: string) => {
+    const raw = value.trim();
+    // Auto-split when user enters multiple filters separated by comma, semicolon, newline,
+    // or space-separated tokens that look like key=value pairs.
+    const looksLikeKV = (s: string) => s.includes('=') && !s.includes('\t');
+    const splitTokens = raw
+      .split(/[,;\n\r]+/g) // first split on explicit separators
+      .flatMap(part => {
+        const p = part.trim();
+        if (!p) return [];
+        // If still contains multiple space-separated tokens and they look like key=value,
+        // split by whitespace.
+        const spaceParts = p.split(/\s+/g).map(s => s.trim()).filter(Boolean);
+        if (spaceParts.length > 1 && spaceParts.every(looksLikeKV)) {
+          return spaceParts;
+        }
+        return [p];
+      })
+      .map(s => s.trim())
+      .filter(Boolean);
+
+    if (splitTokens.length > 1) {
+      const newFilters = [...formData.filters];
+      // Replace current index with first token
+      newFilters[index] = splitTokens[0];
+      // Insert remaining tokens after current index
+      newFilters.splice(index + 1, 0, ...splitTokens.slice(1));
+      setFormData({
+        ...formData,
+        filters: newFilters
+      });
+      return;
+    }
+
+    // Single value path
     const newFilters = [...formData.filters];
-    newFilters[index] = value;
+    newFilters[index] = raw;
     setFormData({
       ...formData,
       filters: newFilters
@@ -168,7 +202,8 @@ function CategoryForm({
           ))}
         </div>
         <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-          Use OpenStreetMap tag syntax. Examples: amenity=restaurant, leisure=park, tourism=attraction
+          Use OpenStreetMap tag syntax. Add one filter per entry (no commas).
+          Examples: amenity=restaurant • leisure=park • tourism=attraction
         </p>
       </div>
 
@@ -221,6 +256,9 @@ export function Admin() {
 
   // Advanced settings state
   const [showAdvanced, setShowAdvanced] = useState(false);
+  // Nominatim contact prompt state
+  const [contactEmailInput, setContactEmailInput] = useState('');
+  const [contactUrlInput, setContactUrlInput] = useState('');
   
   // Rate limiting state
   const [nominatimVariationMs, setNominatimVariationMs] = useState<number>(500); // Default 0.5s variation
@@ -303,6 +341,34 @@ export function Admin() {
   useEffect(() => {
     fetchData();
   }, []);
+  const nominatimEmail = settings.find(s => s.key === 'nominatim_contact_email')?.value?.trim();
+  const needsNominatimContact = !nominatimEmail;
+
+  const saveNominatimContact = async () => {
+    setError(null);
+    try {
+      if (!contactEmailInput.trim()) {
+        setError('Contact email is required for OpenStreetMap/Nominatim.');
+        return;
+      }
+      // very basic email check
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmailInput.trim())) {
+        setError('Please enter a valid contact email.');
+        return;
+      }
+      await handleUpdateSetting('nominatim_contact_email', contactEmailInput.trim());
+      if (contactUrlInput.trim()) {
+        await handleUpdateSetting('nominatim_contact_url', contactUrlInput.trim());
+      }
+      setSuccessMessage('OpenStreetMap contact details saved successfully');
+      setContactEmailInput('');
+      setContactUrlInput('');
+      await fetchData();
+    } catch {
+      // errors already handled
+    }
+  };
+
 
   const handleUpdateSetting = async (key: string, value: string) => {
     try {
@@ -701,6 +767,45 @@ export function Admin() {
         </div>
       )}
 
+      {/* Prompt for missing Nominatim contact configuration */}
+      {needsNominatimContact && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-900/20 p-4">
+          <div className="text-sm text-amber-900 dark:text-amber-100">
+            <p className="font-semibold">Action required: OpenStreetMap contact details</p>
+            <p className="mt-1">
+              To comply with Nominatim usage policy and avoid request blocking, please provide a contact email (and optional website).
+            </p>
+            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium mb-1">Contact Email (required)</label>
+                <input
+                  type="email"
+                  value={contactEmailInput}
+                  onChange={(e) => setContactEmailInput(e.target.value)}
+                  className="input-primary w-full"
+                  placeholder="admin@example.com"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1">Contact Website (optional)</label>
+                <input
+                  type="url"
+                  value={contactUrlInput}
+                  onChange={(e) => setContactUrlInput(e.target.value)}
+                  className="input-primary w-full"
+                  placeholder="https://your-site.example.com"
+                />
+              </div>
+            </div>
+            <div className="mt-3 flex justify-end">
+              <button onClick={saveNominatimContact} className="btn-primary text-sm">
+                Save Contact Details
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Data Summary */}
       {dataSummary && (
         <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
@@ -924,6 +1029,38 @@ export function Admin() {
               className="input-primary max-w-xs"
               placeholder="Enter your home address"
             />
+          </div>
+
+          {/* OpenStreetMap/Nominatim Contact Settings */}
+          <div className="space-y-4">
+            <div className="flex items-center space-x-4">
+              <label className="block text-sm font-medium flex-1">
+                OpenStreetMap Contact Email
+              </label>
+              <input
+                type="email"
+                value={settings.find(s => s.key === 'nominatim_contact_email')?.value || ''}
+                onChange={(e) => handleUpdateSetting('nominatim_contact_email', e.target.value)}
+                className="input-primary max-w-xs"
+                placeholder="admin@example.com"
+              />
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Required by Nominatim usage policy to identify your application.
+            </p>
+
+            <div className="flex items-center space-x-4">
+              <label className="block text-sm font-medium flex-1">
+                OpenStreetMap Contact Website (optional)
+              </label>
+              <input
+                type="url"
+                value={settings.find(s => s.key === 'nominatim_contact_url')?.value || ''}
+                onChange={(e) => handleUpdateSetting('nominatim_contact_url', e.target.value)}
+                className="input-primary max-w-xs"
+                placeholder="https://your-site.example.com"
+              />
+            </div>
           </div>
 
           <div className="space-y-6">
