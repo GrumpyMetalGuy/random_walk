@@ -18,7 +18,7 @@
   "dependencies": {
     "@prisma/client": "^6.9.0",
     "argon2": "^0.40.3",
-    "axios": "^1.9.0",
+    "axios": "^1.13.5",
     "cookie-parser": "^1.4.6",
     "express": "^4.18.2",
     "express-rate-limit": "^7.1.5",
