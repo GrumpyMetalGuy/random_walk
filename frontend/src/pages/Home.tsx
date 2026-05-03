@@ -40,6 +40,16 @@ export function Home() {
     const saved = localStorage.getItem('selectedPlacesCount');
     return saved ? parseInt(saved, 10) : 5;
   });
+  const [minSpacing, setMinSpacing] = useState<number>(() => {
+    // Half the basic unit (mi or km) by default; the value is interpreted in
+    // whatever distance unit the user currently has selected.
+    const saved = localStorage.getItem('selectedMinSpacing');
+    if (saved !== null) {
+      const parsed = parseFloat(saved);
+      if (!isNaN(parsed) && parsed >= 0) return parsed;
+    }
+    return 0.5;
+  });
   const [searchProgress, setSearchProgress] = useState<string>('');
   const [lastSearchTime, setLastSearchTime] = useState<Date | null>(null);
   const [shouldGenerateMore, setShouldGenerateMore] = useState<boolean>(false);
@@ -95,6 +105,12 @@ export function Home() {
   const handleDistanceChange = (distance: number) => {
     setSelectedDistance(distance);
     localStorage.setItem('selectedDistance', distance.toString());
+  };
+
+  const handleMinSpacingChange = (value: number) => {
+    const safe = isNaN(value) || value < 0 ? 0 : value;
+    setMinSpacing(safe);
+    localStorage.setItem('selectedMinSpacing', safe.toString());
   };
 
   useEffect(() => {
@@ -182,15 +198,20 @@ export function Home() {
       );
       
       // Convert distance back to miles for API if needed (backend expects miles)
-      const distanceInMiles = distanceUnit === 'kilometers' 
+      const distanceInMiles = distanceUnit === 'kilometers'
         ? convertDistance(selectedDistance, 'kilometers', 'miles')
         : selectedDistance;
-      
+
+      const minSpacingInMiles = distanceUnit === 'kilometers'
+        ? convertDistance(minSpacing, 'kilometers', 'miles')
+        : minSpacing;
+
       const response = await axios.post(`/api/places/discover`, {
         distance: distanceInMiles,
         categories: selectedCategories.length > 0 ? selectedCategories : availableCategories,
         count: selectedPlacesCount,
         textFilter: textFilter.trim() || undefined,
+        minSpacing: minSpacingInMiles,
       });
       
       // Clear any pending progress timeouts since request completed
@@ -465,6 +486,23 @@ export function Home() {
                 (1-20 places)
               </span>
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Minimum spacing between results ({getUnitAbbreviation(distanceUnit)})
+            </label>
+            <input
+              type="number"
+              step="0.1"
+              min="0"
+              value={minSpacing}
+              onChange={(e) => handleMinSpacingChange(parseFloat(e.target.value))}
+              className="input-primary w-32"
+            />
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Avoids returning places clustered close together. Set to 0 to disable.
+            </p>
           </div>
 
           <div>

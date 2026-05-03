@@ -2,7 +2,7 @@ import { prismaMock } from '../../test/setup.js';
 import request from 'supertest';
 import { app } from '../../app.js';
 import { Place } from '@prisma/client';
-import { setPrismaForTesting } from '../places.js';
+import { setPrismaForTesting, selectSpacedPlaces } from '../places.js';
 import { AuthService } from '../../services/auth.js';
 
 describe('Places API', () => {
@@ -106,6 +106,49 @@ describe('Places API', () => {
       expect(response.status).toBe(200);
       expect(response.body.visitStatus).toBe('IGNORED');
       expect(response.body.lastIgnored).toBeTruthy();
+    });
+  });
+
+  describe('selectSpacedPlaces', () => {
+    // 1 degree of latitude is ~69 miles, so 0.01 deg ≈ 0.69 miles. We use
+    // small offsets to construct close clusters.
+    const nearLondon = (latOffset: number, lonOffset: number, id: number) => ({
+      id,
+      latitude: 51.5 + latOffset,
+      longitude: -0.1 + lonOffset
+    });
+
+    it('returns candidates unchanged when minSpacing is 0', () => {
+      const candidates = [
+        nearLondon(0, 0, 1),
+        nearLondon(0.0005, 0.0005, 2), // ~0.04 miles away
+        nearLondon(0.001, 0.001, 3),
+      ];
+      const result = selectSpacedPlaces(candidates, 5, 0);
+      expect(result.map(p => p.id)).toEqual([1, 2, 3]);
+    });
+
+    it('drops candidates closer than minSpacing to an already-selected place', () => {
+      // First two are ~0.07 miles apart; third is ~7 miles north of the first.
+      const candidates = [
+        nearLondon(0, 0, 1),
+        nearLondon(0.001, 0.001, 2),
+        nearLondon(0.1, 0, 3),
+      ];
+      const result = selectSpacedPlaces(candidates, 5, 0.5);
+      expect(result.map(p => p.id)).toEqual([1, 3]);
+    });
+
+    it('respects the requested count even when more spaced candidates remain', () => {
+      const candidates = [
+        nearLondon(0, 0, 1),
+        nearLondon(0.1, 0, 2),
+        nearLondon(0.2, 0, 3),
+        nearLondon(0.3, 0, 4),
+      ];
+      const result = selectSpacedPlaces(candidates, 2, 0.5);
+      expect(result).toHaveLength(2);
+      expect(result.map(p => p.id)).toEqual([1, 2]);
     });
   });
 

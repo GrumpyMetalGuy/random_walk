@@ -36,12 +36,34 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   const R = 3959; // Earth's radius in miles
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = 
+  const a =
     Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
     Math.sin(dLon/2) * Math.sin(dLon/2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   return R * c;
+}
+
+// Greedy selection that skips candidates within minSpacingMiles of any
+// already-selected place. Iteration order of `candidates` is preserved, so
+// callers should pre-shuffle if random selection is desired.
+export function selectSpacedPlaces<T extends { latitude: number; longitude: number }>(
+  candidates: T[],
+  count: number,
+  minSpacingMiles: number
+): T[] {
+  if (minSpacingMiles <= 0) {
+    return candidates.slice(0, count);
+  }
+  const selected: T[] = [];
+  for (const place of candidates) {
+    if (selected.length >= count) break;
+    const tooClose = selected.some(s =>
+      calculateDistance(s.latitude, s.longitude, place.latitude, place.longitude) < minSpacingMiles
+    );
+    if (!tooClose) selected.push(place);
+  }
+  return selected;
 }
 
 // For testing purposes
@@ -300,9 +322,10 @@ router.post('/generate', async (req: AuthenticatedRequest, res) => {
 // Smart place discovery - generates new places from OSM and returns random selections
 router.post('/discover', async (req: AuthenticatedRequest, res) => {
   try {
-    const { distance, categories, count = 5, textFilter } = req.body;
-    
-    console.log(`Discovering ${count} places within ${distance} miles for categories:`, categories, textFilter ? `with text filter: "${textFilter}"` : '');
+    const { distance, categories, count = 5, textFilter, minSpacing } = req.body;
+    const minSpacingMiles = typeof minSpacing === 'number' && minSpacing > 0 ? minSpacing : 0;
+
+    console.log(`Discovering ${count} places within ${distance} miles for categories:`, categories, textFilter ? `with text filter: "${textFilter}"` : '', minSpacingMiles > 0 ? `min spacing: ${minSpacingMiles} miles` : '');
     
     // Get home address from settings
     const homeAddressSetting = await prisma.setting.findUnique({
@@ -361,12 +384,12 @@ router.post('/discover', async (req: AuthenticatedRequest, res) => {
       });
     
     console.log(`Found ${filteredPlaces.length} existing places matching criteria`);
-    
-    // Always return available places without automatic OSM generation
-    const randomPlaces = filteredPlaces
-      .sort(() => Math.random() - 0.5)
-      .slice(0, Math.min(count, filteredPlaces.length));
-    
+
+    // Always return available places without automatic OSM generation. Shuffle
+    // first, then greedily pick respecting the minimum spacing constraint.
+    const shuffledPlaces = filteredPlaces.sort(() => Math.random() - 0.5);
+    const randomPlaces = selectSpacedPlaces(shuffledPlaces, count, minSpacingMiles);
+
     console.log(`Returning ${randomPlaces.length} existing places`);
     
     // Enhance with reverse geocoding for postcodes

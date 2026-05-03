@@ -1,18 +1,27 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import axios from 'axios';
 import { SetupWizard } from '../SetupWizard';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
+vi.mock('axios');
+const mockedAxios = vi.mocked(axios);
+
 describe('SetupWizard', () => {
   const mockOnComplete = vi.fn();
-  
+
   beforeEach(() => {
     mockOnComplete.mockClear();
-    vi.spyOn(window, 'fetch').mockImplementation((_url) => {
-      return Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve({}),
-      } as Response);
-    });
+    vi.clearAllMocks();
+    // Wizard uses both put (settings) and post (auth/setup, auth/login). Default
+    // every call to a generic success response.
+    mockedAxios.put.mockResolvedValue({ data: { success: true } } as any);
+    mockedAxios.post.mockResolvedValue({
+      data: { success: true, token: 'test-token', user: { id: 1, username: 'admin', role: 'ADMIN' } },
+    } as any);
+    // isAxiosError is read in error branches; default to false so the catch path
+    // doesn't trip.
+    (mockedAxios as any).isAxiosError = vi.fn(() => false);
+    (mockedAxios as any).defaults = { headers: { common: {} } };
   });
 
   const renderSetupWizard = () => {
@@ -29,7 +38,7 @@ describe('SetupWizard', () => {
     expect(screen.getByRole('button', { name: /Next: Set Home Location/i })).toBeInTheDocument();
   });
 
-  it('progresses through all three steps', async () => {
+  it('progresses through every wizard step and reports completion', async () => {
     renderSetupWizard();
     
     // Step 1: Admin account creation
@@ -51,7 +60,10 @@ describe('SetupWizard', () => {
     
     const addressInput = screen.getByPlaceholderText(/Enter your home address/i);
     fireEvent.change(addressInput, { target: { value: '1 Test Street, Test City' } });
-    
+
+    const contactEmailInput = screen.getByPlaceholderText(/admin@example\.com/i);
+    fireEvent.change(contactEmailInput, { target: { value: 'tester@example.com' } });
+
     const nextButton2 = screen.getByRole('button', { name: /Next: Configure Distances/i });
     fireEvent.click(nextButton2);
     
@@ -62,10 +74,15 @@ describe('SetupWizard', () => {
     
     expect(screen.getByText(/Distance Unit Preference/i)).toBeInTheDocument();
     expect(screen.getByText(/Search Distance Ranges/i)).toBeInTheDocument();
-    
-    const completeButton = screen.getByRole('button', { name: /Complete Setup/i });
-    fireEvent.click(completeButton);
-    
+
+    const nextButton3 = screen.getByRole('button', { name: /Next: Generate Places/i });
+    fireEvent.click(nextButton3);
+
+    // Step 4: Place generation. Use the skip path so the test doesn't depend on
+    // the SSE generation flow.
+    const skipButton = await screen.findByRole('button', { name: /Skip for now/i });
+    fireEvent.click(skipButton);
+
     await waitFor(() => {
       expect(mockOnComplete).toHaveBeenCalled();
     });
