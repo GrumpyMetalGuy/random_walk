@@ -50,6 +50,20 @@ export function parseDescription(description: string): ParsedDescription {
 }
 
 /**
+ * Extract the human-readable address from a place description, if present.
+ * Descriptions are " • "-separated parts; the address is the part starting
+ * with the "📍 " marker emitted by the OSM/reverse-geocoding pipeline.
+ */
+export function extractAddress(description: string | null): string | null {
+  if (!description) return null;
+  const parts = description.split(' • ');
+  const locationPart = parts.find(p => p.startsWith('📍 '));
+  if (!locationPart) return null;
+  const trimmed = locationPart.replace(/^📍\s*/, '').trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/**
  * Extract postcode from description
  */
 export function extractPostcode(description: string | null): string | null {

@@ -22,14 +22,20 @@ Random Walk is a secure web application that helps users discover and track inte
 - Distance-based filtering
 - Bounding box search for geographic constraints
 - Natural language queries for better place matching
+- **Minimum spacing** between returned suggestions, applied as a greedy post-filter so clustered POIs (e.g. two playgrounds 50m apart) don't both appear in the same result set. Per-search, persisted in localStorage. Defaults to half of the user's basic distance unit (0.5 mi or 0.5 km).
+- **Opt-in re-suggestion of visited places**: a search-form checkbox (off by default, persisted) widens the candidate pool from `AVAILABLE` to `AVAILABLE` + `VISITED`. Re-suggested visited places render with a "Plan to Visit Again" action and any existing notes shown read-only.
 
 ### Place Management
-- Three-state visit tracking:
+- Four-state visit tracking:
   1. Available - Places discovered but not yet planned
   2. Planning to Visit - Places marked for future visits
   3. Visited - Places already visited
+  4. Ignored - Places the user has explicitly dismissed
 - Ability to plan/unplan visits
 - Mark places as visited/unvisited
+- Ignore/unignore places
+- **Per-place freeform notes** on visited and ignored entries (max 2000 characters), editable inline on the Places page; cleared by submitting an empty/whitespace-only value
+- **Copyable address link**: each suggestion's address is rendered as a clickable element that copies the address (or coordinates as a fallback) to the clipboard, so users can paste into any maps/sat-nav app of their choice. The OSM link is preserved alongside it.
 - View place details including distance and description
 - **Shared place data** between all users
 
@@ -65,12 +71,23 @@ Random Walk is a secure web application that helps users discover and track inte
 - **POST** `/api/auth/register` - Create new user account (admin only)
 
 ### Places API
-- **GET** `/api/places` - Get all places with visit status
+- **GET** `/api/places` - Get all places with visit status (supports `?exclude=AVAILABLE` to fetch only interacted-with entries)
 - **POST** `/api/places/random` - Get random places within distance
+- **POST** `/api/places/discover` - Discover places with full search options. Body fields:
+  - `distance` (miles, required)
+  - `categories` (string[], optional — locationType filter)
+  - `count` (default 5)
+  - `textFilter` (substring match against name/description)
+  - `minSpacing` (miles, optional — greedy minimum-distance constraint between returned places)
+  - `includeVisited` (boolean, default false — when true also surfaces previously-VISITED places)
+- **POST** `/api/places/generate-comprehensive` - SSE stream that ingests fresh OSM data with progress updates
+- **PATCH** `/api/places/:id` - Update editable fields on a place. Currently accepts `{ notes: string | null }` (max 2000 chars; whitespace-only clears the field)
 - **POST** `/api/places/:id/plan` - Plan to visit a place
 - **POST** `/api/places/:id/unplan` - Cancel plan to visit
 - **POST** `/api/places/:id/visit` - Mark place as visited
 - **POST** `/api/places/:id/unvisit` - Unmark place as visited
+- **POST** `/api/places/:id/ignore` - Mark place as ignored
+- **POST** `/api/places/:id/unignore` - Restore an ignored place to AVAILABLE
 - **POST** `/api/places/generate` - Generate new places
 
 ### Settings API
@@ -132,6 +149,8 @@ Default number of places to generate:
 
 ### Other Settings
 - Maximum places in random search: 5
+- Default minimum spacing between search results: 0.5 (in the user's basic distance unit; persisted in `localStorage.selectedMinSpacing`)
+- "Include previously visited places" search toggle: off by default; persisted in `localStorage.selectedIncludeVisited`
 - OpenStreetMap rate limiting: 1.5 seconds between requests
 - Search radius conversion: miles to degrees (radius/69 for latitude)
 
@@ -155,9 +174,11 @@ Default number of places to generate:
 - **longitude**: Float
 - **what3words**: String (Optional)
 - **osmId**: String (Optional, Unique)
-- **isVisited**: Boolean (Default: false)
+- **visitStatus**: VisitStatus enum (`AVAILABLE` | `PLANNED` | `VISITED` | `IGNORED`, default `AVAILABLE`)
+- **notes**: String (Optional, max 2000 chars — freeform user notes on visited/ignored entries)
 - **dateAdded**: DateTime
 - **lastVisited**: DateTime (Optional)
+- **lastIgnored**: DateTime (Optional)
 - **createdAt**: DateTime
 - **updatedAt**: DateTime
 
@@ -224,7 +245,9 @@ Key types include:
 
 ## Database Migrations
 - **Prisma ORM v6.9.0** for database management
-- **Single squashed migration** for clean deployment
 - **Database named**: `randomwalk.db` (updated from `placefinder.db`)
-- Automatic migration application on container start
-- Backup strategies for production data 
+- Automatic migration application on container start via `prisma migrate deploy` (run by `DatabaseService.initialize()` on every boot)
+- Schema changes ship as additive Prisma migrations so existing installations upgrade in place. Current migration history:
+  - `20250613100226_init` — initial squashed schema
+  - `20260503175336_add_place_notes` — adds nullable `notes` column to `places`
+- Backup strategies for production data

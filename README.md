@@ -20,10 +20,14 @@ Random Walk is a secure web application that helps users discover and track inte
   - Search for places within customizable distances (5-40 miles)
   - Filter by place types (parks, tourist attractions, towns, cities, playgrounds)
   - Get random place suggestions
+  - **Configurable minimum spacing** between search results to avoid clustered duplicates (defaults to half the user's basic distance unit)
+  - **Optional re-suggestion** of previously visited places via an opt-in checkbox on the search form
   - International location support with country-specific filtering
-  - Track places with three states: Available, Planning to Visit, and Visited
+  - Track places with four states: Available, Planning to Visit, Visited, and Ignored
   - Plan and unplan visits
   - Mark places as visited/unvisited
+  - **Free-text notes** on visited and ignored places, editable inline from the Places page
+  - **One-click address copy**: each suggestion's address is rendered as a clickable link that copies it to the clipboard for pasting into the user's preferred maps/sat-nav app
   - **Shared place visits** between all users
 
 ### 🏠 **Smart Location Handling**
@@ -242,8 +246,11 @@ The application provides several API endpoints for authentication, places, setti
 ### Places & Locations
 - **GET** `/api/places` - Get all places
 - **POST** `/api/places/random` - Get random places
+- **POST** `/api/places/discover` - Search with category, distance, text, minimum-spacing, and include-visited filters
+- **PATCH** `/api/places/:id` - Update editable fields on a place (currently `notes`)
 - **POST** `/api/places/:id/plan` - Plan to visit
 - **POST** `/api/places/:id/visit` - Mark as visited
+- **POST** `/api/places/:id/ignore` - Ignore a place
 - **POST** `/api/location/validate` - Validate location
 
 ### Admin Only

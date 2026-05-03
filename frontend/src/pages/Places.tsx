@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { parseDescription, formatCategoryName, generateOSMLink, formatDate } from '../utils';
+import { parseDescription, extractAddress, formatCategoryName, generateOSMLink, formatDate } from '../utils';
+import { AddressLink } from '../components/AddressLink';
 import axios from 'axios';
 
 
@@ -57,6 +58,74 @@ export function Places() {
     } finally {
       setSavingNotes(false);
     }
+  };
+
+  const renderPlaceBody = (place: Place) => {
+    const parsed = parseDescription(place.description || '');
+    const visibleParts = parsed.parts.filter(p => !p.content.startsWith('📍 '));
+    const address = extractAddress(place.description) ?? `${place.latitude}, ${place.longitude}`;
+    const osmLink = generateOSMLink(place);
+    return (
+      <>
+        {visibleParts.length > 0 && (
+          <div className="text-gray-600 dark:text-gray-400 mt-1">
+            {visibleParts.map((part, index) => (
+              <span key={index}>
+                {part.type === 'website' ? (
+                  <a
+                    href={part.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline"
+                  >
+                    {part.content}
+                  </a>
+                ) : part.type === 'phone' ? (
+                  <a
+                    href={part.url}
+                    className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline"
+                  >
+                    {part.content}
+                  </a>
+                ) : (
+                  <span>{part.content}</span>
+                )}
+                {index < visibleParts.length - 1 && ' • '}
+              </span>
+            ))}
+          </div>
+        )}
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+          {formatCategoryName(place.locationType)}
+          {' • '}
+          <AddressLink address={address} />
+          {osmLink && (
+            <>
+              {' • '}
+              <a
+                href={osmLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline"
+                title="View on OpenStreetMap"
+              >
+                🗺️ OSM
+              </a>
+            </>
+          )}
+          {place.lastVisited && place.visitStatus === 'VISITED' && (
+            <span className="text-green-600 dark:text-green-400">
+              {' • '}Visited {formatDate(place.lastVisited)}
+            </span>
+          )}
+          {place.lastIgnored && place.visitStatus === 'IGNORED' && (
+            <span className="text-orange-600 dark:text-orange-400">
+              {' • '}Ignored {formatDate(place.lastIgnored)}
+            </span>
+          )}
+        </p>
+      </>
+    );
   };
 
   const renderNotesBlock = (place: Place) => {
@@ -179,59 +248,7 @@ export function Places() {
               <div className="flex justify-between items-start">
                 <div>
                   <h4 className="text-lg font-medium">{place.name}</h4>
-                  {place.description && (
-                    <div className="text-gray-600 dark:text-gray-400 mt-1">
-                      {parseDescription(place.description || '').parts.map((part, index) => (
-                        <span key={index}>
-                          {part.type === 'website' ? (
-                            <a
-                              href={part.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline"
-                            >
-                              {part.content}
-                            </a>
-                          ) : part.type === 'phone' ? (
-                            <a
-                              href={part.url}
-                              className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline"
-                            >
-                              {part.content}
-                            </a>
-                          ) : (
-                            <span>{part.content}</span>
-                          )}
-                          {index < parseDescription(place.description || '').parts.length - 1 && ' • '}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                    {formatCategoryName(place.locationType)}
-                    {(() => {
-                      const osmLink = generateOSMLink(place);
-                      return osmLink && (
-                        <>
-                          {' • '}
-                          <a
-                            href={osmLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline"
-                            title="View on OpenStreetMap"
-                          >
-                            🗺️ OSM
-                          </a>
-                        </>
-                      );
-                    })()}
-                    {place.lastVisited && (
-                      <span className="text-green-600 dark:text-green-400">
-                        {' • '}Visited {formatDate(place.lastVisited)}
-                      </span>
-                    )}
-                  </p>
+                  {renderPlaceBody(place)}
                   {renderNotesBlock(place)}
                 </div>
                 {user?.role === 'ADMIN' && (
@@ -265,59 +282,7 @@ export function Places() {
               <div className="flex justify-between items-start">
                 <div>
                   <h4 className="text-lg font-medium">{place.name}</h4>
-                  {place.description && (
-                    <div className="text-gray-600 dark:text-gray-400 mt-1">
-                      {parseDescription(place.description || '').parts.map((part, index) => (
-                        <span key={index}>
-                          {part.type === 'website' ? (
-                            <a
-                              href={part.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline"
-                            >
-                              {part.content}
-                            </a>
-                          ) : part.type === 'phone' ? (
-                            <a
-                              href={part.url}
-                              className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline"
-                            >
-                              {part.content}
-                            </a>
-                          ) : (
-                            <span>{part.content}</span>
-                          )}
-                          {index < parseDescription(place.description || '').parts.length - 1 && ' • '}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                    {formatCategoryName(place.locationType)}
-                    {(() => {
-                      const osmLink = generateOSMLink(place);
-                      return osmLink && (
-                        <>
-                          {' • '}
-                          <a
-                            href={osmLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline"
-                            title="View on OpenStreetMap"
-                          >
-                            🗺️ OSM
-                          </a>
-                        </>
-                      );
-                    })()}
-                    {place.lastIgnored && (
-                      <span className="text-orange-600 dark:text-orange-400">
-                        {' • '}Ignored {formatDate(place.lastIgnored)}
-                      </span>
-                    )}
-                  </p>
+                  {renderPlaceBody(place)}
                   {renderNotesBlock(place)}
                 </div>
                 {user?.role === 'ADMIN' && (

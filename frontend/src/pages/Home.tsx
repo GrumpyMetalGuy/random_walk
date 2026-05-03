@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { DistanceUnit, convertDistance, formatDistance, parseDistanceUnit, getUnitAbbreviation } from '../utils/distance';
-import { parseDescription, extractPostcode, formatCategoryName, generateOSMLink } from '../utils';
+import { parseDescription, extractAddress, formatCategoryName, generateOSMLink } from '../utils';
+import { AddressLink } from '../components/AddressLink';
 import { useAuth } from '../contexts/AuthContext';
 
 // Using relative URLs since frontend and backend are same-origin
@@ -204,7 +205,7 @@ export function Home() {
     setSearchResultIds(new Set());
     
     // Set up progress timeouts that we can cancel if request completes quickly
-    const progressTimeouts: number[] = [];
+    const progressTimeouts: ReturnType<typeof setTimeout>[] = [];
     
     try {
       // Only show progress updates if request takes time
@@ -343,9 +344,14 @@ export function Home() {
   };
 
   const renderPlace = (place: Place) => {
-    const postcode = extractPostcode(place.description);
     const parsedDescription = parseDescription(place.description || '');
-    
+    // The 📍 location row is surfaced separately as a copyable address; hide it
+    // from the inline description list so it isn't shown twice.
+    const visibleDescriptionParts = parsedDescription.parts.filter(
+      p => !p.content.startsWith('📍 ')
+    );
+    const address = extractAddress(place.description) ?? `${place.latitude}, ${place.longitude}`;
+
     return (
       <div
         key={place.id}
@@ -354,9 +360,9 @@ export function Home() {
         <div className="flex justify-between items-start">
           <div>
             <h4 className="text-lg font-medium">{place.name}</h4>
-            {place.description && (
+            {visibleDescriptionParts.length > 0 && (
               <div className="text-gray-600 dark:text-gray-400 mt-1">
-                {parsedDescription.parts.map((part, index) => (
+                {visibleDescriptionParts.map((part, index) => (
                   <span key={index}>
                     {part.type === 'website' ? (
                       <a
@@ -377,7 +383,7 @@ export function Home() {
                     ) : (
                       <span>{part.content}</span>
                     )}
-                    {index < parsedDescription.parts.length - 1 && ' • '}
+                    {index < visibleDescriptionParts.length - 1 && ' • '}
                   </span>
                 ))}
               </div>
@@ -385,12 +391,13 @@ export function Home() {
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
               {formatCategoryName(place.locationType)}
               {place.distance !== undefined && ` • ${formatDistance(
-                distanceUnit === 'kilometers' 
+                distanceUnit === 'kilometers'
                   ? convertDistance(place.distance, 'miles', 'kilometers')
-                  : place.distance, 
+                  : place.distance,
                 distanceUnit
               )} away`}
-              {postcode && ` • ${postcode}`}
+              {' • '}
+              <AddressLink address={address} />
               {(() => {
                 const osmLink = generateOSMLink(place);
                 return osmLink && (
