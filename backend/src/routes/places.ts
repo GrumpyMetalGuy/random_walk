@@ -168,6 +168,46 @@ router.post('/:id/plan', async (req: AuthenticatedRequest, res) => {
   }
 });
 
+// Update notes on a place. Used for the user-facing notes field on
+// visited/ignored entries; null/empty clears the field.
+router.patch('/:id', async (req: AuthenticatedRequest, res) => {
+  const { id } = req.params;
+
+  const updateSchema = z.object({
+    notes: z.string().max(2000).nullable().optional()
+  });
+
+  try {
+    const parsed = updateSchema.parse(req.body);
+
+    const place = await prisma.place.findUnique({
+      where: { id: parseInt(id) }
+    });
+    if (!place) {
+      return res.status(404).json({ error: 'Place not found' });
+    }
+
+    const data: { notes?: string | null } = {};
+    if ('notes' in parsed) {
+      const trimmed = parsed.notes?.trim();
+      data.notes = trimmed ? trimmed : null;
+    }
+
+    const updatedPlace = await prisma.place.update({
+      where: { id: parseInt(id) },
+      data
+    });
+
+    res.json(updatedPlace);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: error.errors });
+    }
+    console.error('Failed to update place:', error);
+    res.status(500).json({ error: 'Failed to update place' });
+  }
+});
+
 // Mark place as visited
 router.post('/:id/visit', async (req: AuthenticatedRequest, res) => {
   const { id } = req.params;
@@ -322,10 +362,11 @@ router.post('/generate', async (req: AuthenticatedRequest, res) => {
 // Smart place discovery - generates new places from OSM and returns random selections
 router.post('/discover', async (req: AuthenticatedRequest, res) => {
   try {
-    const { distance, categories, count = 5, textFilter, minSpacing } = req.body;
+    const { distance, categories, count = 5, textFilter, minSpacing, includeVisited } = req.body;
     const minSpacingMiles = typeof minSpacing === 'number' && minSpacing > 0 ? minSpacing : 0;
+    const allowVisited = includeVisited === true;
 
-    console.log(`Discovering ${count} places within ${distance} miles for categories:`, categories, textFilter ? `with text filter: "${textFilter}"` : '', minSpacingMiles > 0 ? `min spacing: ${minSpacingMiles} miles` : '');
+    console.log(`Discovering ${count} places within ${distance} miles for categories:`, categories, textFilter ? `with text filter: "${textFilter}"` : '', minSpacingMiles > 0 ? `min spacing: ${minSpacingMiles} miles` : '', allowVisited ? '(including visited)' : '');
     
     // Get home address from settings
     const homeAddressSetting = await prisma.setting.findUnique({
@@ -348,10 +389,15 @@ router.post('/discover', async (req: AuthenticatedRequest, res) => {
     
     console.log(`Home coordinates: ${lat}, ${lon}`);
     
-    // First, check if we have enough available places in the database
+    // First, check if we have enough candidate places in the database. By
+    // default only AVAILABLE places are considered, but the caller may opt in
+    // to also surface previously-VISITED places.
+    const candidateStatuses: ('AVAILABLE' | 'VISITED')[] = allowVisited
+      ? ['AVAILABLE', 'VISITED']
+      : ['AVAILABLE'];
     const availablePlaces = await prisma.place.findMany({
       where: {
-        visitStatus: 'AVAILABLE'
+        visitStatus: { in: candidateStatuses }
       }
     });
     

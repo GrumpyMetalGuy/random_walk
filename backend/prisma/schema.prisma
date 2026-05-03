@@ -37,6 +37,7 @@ model Place {
   what3words  String?
   osmId       String?    @unique
   visitStatus VisitStatus @default(AVAILABLE)
+  notes       String?
   dateAdded   DateTime    @default(now())
   lastVisited DateTime?
   lastIgnored DateTime?

@@ -15,6 +15,7 @@ interface Place {
   longitude: number;
   lastVisited?: string | null;
   lastIgnored?: string | null;
+  notes?: string | null;
 }
 
 export function Places() {
@@ -22,10 +23,93 @@ export function Places() {
   const [places, setPlaces] = useState<Place[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingNotesId, setEditingNotesId] = useState<number | null>(null);
+  const [notesDraft, setNotesDraft] = useState<string>('');
+  const [savingNotes, setSavingNotes] = useState(false);
 
   useEffect(() => {
     fetchPlaces();
   }, []);
+
+  const startEditNotes = (place: Place) => {
+    setEditingNotesId(place.id);
+    setNotesDraft(place.notes ?? '');
+  };
+
+  const cancelEditNotes = () => {
+    setEditingNotesId(null);
+    setNotesDraft('');
+  };
+
+  const saveNotes = async (placeId: number) => {
+    setSavingNotes(true);
+    try {
+      const response = await axios.patch(`/api/places/${placeId}`, {
+        notes: notesDraft,
+      });
+      const updated = response.data;
+      setPlaces(places.map(p => (p.id === placeId ? { ...p, notes: updated.notes ?? null } : p)));
+      setEditingNotesId(null);
+      setNotesDraft('');
+    } catch (err) {
+      console.error('Failed to save notes:', err);
+      setError('Failed to save notes. Please try again.');
+    } finally {
+      setSavingNotes(false);
+    }
+  };
+
+  const renderNotesBlock = (place: Place) => {
+    const isEditing = editingNotesId === place.id;
+    if (isEditing) {
+      return (
+        <div className="mt-3 space-y-2">
+          <textarea
+            value={notesDraft}
+            onChange={(e) => setNotesDraft(e.target.value)}
+            rows={3}
+            maxLength={2000}
+            placeholder="Add notes for this place..."
+            className="input-primary w-full"
+          />
+          <div className="flex space-x-2">
+            <button
+              onClick={() => saveNotes(place.id)}
+              disabled={savingNotes}
+              className="btn-primary text-sm"
+            >
+              {savingNotes ? 'Saving...' : 'Save'}
+            </button>
+            <button
+              onClick={cancelEditNotes}
+              disabled={savingNotes}
+              className="btn-secondary text-sm"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="mt-3">
+        {place.notes ? (
+          <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap bg-gray-50 dark:bg-gray-700 rounded p-2">
+            {place.notes}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400 dark:text-gray-500 italic">No notes yet.</p>
+        )}
+        <button
+          onClick={() => startEditNotes(place)}
+          className="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+        >
+          {place.notes ? 'Edit notes' : 'Add notes'}
+        </button>
+      </div>
+    );
+  };
 
   const fetchPlaces = async () => {
     try {
@@ -148,6 +232,7 @@ export function Places() {
                       </span>
                     )}
                   </p>
+                  {renderNotesBlock(place)}
                 </div>
                 {user?.role === 'ADMIN' && (
                   <button
@@ -233,6 +318,7 @@ export function Places() {
                       </span>
                     )}
                   </p>
+                  {renderNotesBlock(place)}
                 </div>
                 {user?.role === 'ADMIN' && (
                   <button

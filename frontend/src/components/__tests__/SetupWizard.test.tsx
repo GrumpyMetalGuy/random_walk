@@ -4,7 +4,14 @@ import { SetupWizard } from '../SetupWizard';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 vi.mock('axios');
-const mockedAxios = vi.mocked(axios);
+// axios overloaded signatures don't expose vitest mock helpers via vi.mocked,
+// so cast to a permissive shape for assignments below.
+const mockedAxios = axios as unknown as {
+  put: ReturnType<typeof vi.fn>;
+  post: ReturnType<typeof vi.fn>;
+  isAxiosError: ReturnType<typeof vi.fn>;
+  defaults: { headers: { common: Record<string, string> } };
+};
 
 describe('SetupWizard', () => {
   const mockOnComplete = vi.fn();
@@ -14,14 +21,12 @@ describe('SetupWizard', () => {
     vi.clearAllMocks();
     // Wizard uses both put (settings) and post (auth/setup, auth/login). Default
     // every call to a generic success response.
-    mockedAxios.put.mockResolvedValue({ data: { success: true } } as any);
-    mockedAxios.post.mockResolvedValue({
+    mockedAxios.put = vi.fn().mockResolvedValue({ data: { success: true } });
+    mockedAxios.post = vi.fn().mockResolvedValue({
       data: { success: true, token: 'test-token', user: { id: 1, username: 'admin', role: 'ADMIN' } },
-    } as any);
-    // isAxiosError is read in error branches; default to false so the catch path
-    // doesn't trip.
-    (mockedAxios as any).isAxiosError = vi.fn(() => false);
-    (mockedAxios as any).defaults = { headers: { common: {} } };
+    });
+    mockedAxios.isAxiosError = vi.fn().mockReturnValue(false);
+    mockedAxios.defaults = { headers: { common: {} } };
   });
 
   const renderSetupWizard = () => {

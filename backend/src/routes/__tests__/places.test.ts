@@ -30,6 +30,7 @@ describe('Places API', () => {
     what3words: 'example.test.words',
     osmId: 'test123',
     visitStatus: 'AVAILABLE',
+    notes: null,
     dateAdded: new Date(),
     lastVisited: null,
     lastIgnored: null,
@@ -149,6 +150,61 @@ describe('Places API', () => {
       const result = selectSpacedPlaces(candidates, 2, 0.5);
       expect(result).toHaveLength(2);
       expect(result.map(p => p.id)).toEqual([1, 2]);
+    });
+  });
+
+  describe('PATCH /api/places/:id', () => {
+    it('updates notes on an existing place', async () => {
+      const updated = { ...mockPlace, notes: 'Loved this trail' };
+      prismaMock.place.findUnique.mockResolvedValue(mockPlace);
+      prismaMock.place.update.mockResolvedValue(updated);
+
+      const response = await request(app)
+        .patch('/api/places/1')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ notes: 'Loved this trail' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.notes).toBe('Loved this trail');
+      expect(prismaMock.place.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { notes: 'Loved this trail' } })
+      );
+    });
+
+    it('clears notes when given an empty string', async () => {
+      const cleared = { ...mockPlace, notes: null };
+      prismaMock.place.findUnique.mockResolvedValue({ ...mockPlace, notes: 'old' });
+      prismaMock.place.update.mockResolvedValue(cleared);
+
+      const response = await request(app)
+        .patch('/api/places/1')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ notes: '   ' });
+
+      expect(response.status).toBe(200);
+      expect(prismaMock.place.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { notes: null } })
+      );
+    });
+
+    it('returns 404 for unknown place', async () => {
+      prismaMock.place.findUnique.mockResolvedValue(null);
+
+      const response = await request(app)
+        .patch('/api/places/999')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ notes: 'anything' });
+
+      expect(response.status).toBe(404);
+    });
+
+    it('rejects notes longer than 2000 chars', async () => {
+      const response = await request(app)
+        .patch('/api/places/1')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ notes: 'x'.repeat(2001) });
+
+      expect(response.status).toBe(400);
     });
   });
 

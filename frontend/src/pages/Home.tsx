@@ -19,6 +19,7 @@ interface Place {
   longitude: number;
   lastVisited?: string | null;
   lastIgnored?: string | null;
+  notes?: string | null;
 }
 
 export function Home() {
@@ -50,6 +51,13 @@ export function Home() {
     }
     return 0.5;
   });
+  const [includeVisited, setIncludeVisited] = useState<boolean>(() => {
+    return localStorage.getItem('selectedIncludeVisited') === 'true';
+  });
+  // Tracks which places came back from the latest /discover call so we can
+  // include re-suggested VISITED ones in the suggestions panel without showing
+  // every visited place ever recorded.
+  const [searchResultIds, setSearchResultIds] = useState<Set<number>>(new Set());
   const [searchProgress, setSearchProgress] = useState<string>('');
   const [lastSearchTime, setLastSearchTime] = useState<Date | null>(null);
   const [shouldGenerateMore, setShouldGenerateMore] = useState<boolean>(false);
@@ -111,6 +119,11 @@ export function Home() {
     const safe = isNaN(value) || value < 0 ? 0 : value;
     setMinSpacing(safe);
     localStorage.setItem('selectedMinSpacing', safe.toString());
+  };
+
+  const handleIncludeVisitedChange = (value: boolean) => {
+    setIncludeVisited(value);
+    localStorage.setItem('selectedIncludeVisited', value ? 'true' : 'false');
   };
 
   useEffect(() => {
@@ -184,8 +197,11 @@ export function Home() {
     setShouldGenerateMore(false);
     setLastSearchMeta(null);
     
-    // Clear previous available places at the start of search
-    setPlaces(places => places.filter(p => p.visitStatus !== 'AVAILABLE'));
+    // Clear previous suggestion-panel entries at the start of search. That
+    // covers AVAILABLE places plus any VISITED ones we'd previously surfaced
+    // via includeVisited.
+    setPlaces(places => places.filter(p => p.visitStatus !== 'AVAILABLE' && !searchResultIds.has(p.id)));
+    setSearchResultIds(new Set());
     
     // Set up progress timeouts that we can cancel if request completes quickly
     const progressTimeouts: number[] = [];
@@ -212,6 +228,7 @@ export function Home() {
         count: selectedPlacesCount,
         textFilter: textFilter.trim() || undefined,
         minSpacing: minSpacingInMiles,
+        includeVisited,
       });
       
       // Clear any pending progress timeouts since request completed
@@ -233,11 +250,15 @@ export function Home() {
         // Small delay to show the preparing message
         await new Promise(resolve => setTimeout(resolve, 300));
         
-        // Add new places to the existing planned and visited places
-        setPlaces(places => [
-          ...places, // This now only contains non-available places due to clearing above
-          ...newPlaces
-        ]);
+        // Add new places to the existing planned and visited places. If a
+        // returned VISITED place is already in state from the initial fetch,
+        // merge instead of duplicating.
+        setPlaces(prev => {
+          const incomingIds = new Set(newPlaces.map((p: Place) => p.id));
+          const retained = prev.filter(p => !incomingIds.has(p.id));
+          return [...retained, ...newPlaces];
+        });
+        setSearchResultIds(new Set(newPlaces.map((p: Place) => p.id)));
         setLastSearchTime(new Date());
         setLastSearchMeta(meta);
         setShouldGenerateMore(meta?.shouldGenerateMore || false);
@@ -423,20 +444,37 @@ export function Home() {
             </>
           )}
           {place.visitStatus === 'VISITED' && (
-            <button
-              onClick={() => handleUnvisit(place.id)}
-              className="btn-secondary"
-            >
-              Unmark as Visited
-            </button>
+            <>
+              <button
+                onClick={() => handlePlanVisit(place.id)}
+                className="btn-primary"
+              >
+                Plan to Visit Again
+              </button>
+              <button
+                onClick={() => handleUnvisit(place.id)}
+                className="btn-secondary"
+              >
+                Unmark as Visited
+              </button>
+            </>
           )}
         </div>
       </div>
+      {place.visitStatus === 'VISITED' && place.notes && (
+        <div className="mt-3 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap bg-gray-50 dark:bg-gray-700 rounded p-2">
+          {place.notes}
+        </div>
+      )}
     </div>
     );
   };
 
-  const availablePlaces = places.filter(p => p.visitStatus === 'AVAILABLE');
+  // The suggestions panel shows all AVAILABLE places plus any VISITED places
+  // that came back from the latest /discover (i.e. opted-in re-suggestions).
+  const availablePlaces = places.filter(
+    p => p.visitStatus === 'AVAILABLE' || (p.visitStatus === 'VISITED' && searchResultIds.has(p.id))
+  );
   const plannedPlaces = places.filter(p => p.visitStatus === 'PLANNED');
 
   return (
@@ -502,6 +540,21 @@ export function Home() {
             />
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               Avoids returning places clustered close together. Set to 0 to disable.
+            </p>
+          </div>
+
+          <div>
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={includeVisited}
+                onChange={(e) => handleIncludeVisitedChange(e.target.checked)}
+                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600"
+              />
+              <span className="ml-2 text-sm font-medium">Include previously visited places</span>
+            </label>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 ml-6">
+              When enabled, places you've marked as visited can be suggested again.
             </p>
           </div>
 
