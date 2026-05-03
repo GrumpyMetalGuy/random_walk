@@ -71,35 +71,90 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c;
 }
 
+// Subset of Nominatim's address fields we care about. Nominatim returns more
+// (e.g. country_code, ISO3166-2-lvl4) but we only need these for composing a
+// human-readable street address.
+interface NominatimAddressFields {
+  house_number?: string;
+  road?: string;
+  pedestrian?: string;
+  footway?: string;
+  cycleway?: string;
+  path?: string;
+  suburb?: string;
+  neighbourhood?: string;
+  hamlet?: string;
+  village?: string;
+  town?: string;
+  city?: string;
+  municipality?: string;
+  county?: string;
+  state?: string;
+  postcode?: string;
+  country?: string;
+}
+
+export interface GeocodeInfo {
+  formattedAddress?: string;
+  city?: string;
+  postcode?: string;
+  country?: string;
+}
+
+// Compose a human-readable street address from Nominatim's structured address
+// fields, falling back through progressively coarser data when more specific
+// fields aren't available. Returns null if there's nothing usable.
+export function formatStructuredAddress(addr: NominatimAddressFields): string | null {
+  const parts: string[] = [];
+  const street =
+    addr.road ?? addr.pedestrian ?? addr.footway ?? addr.cycleway ?? addr.path;
+  if (addr.house_number && street) {
+    parts.push(`${addr.house_number} ${street}`);
+  } else if (street) {
+    parts.push(street);
+  }
+  const locality = addr.suburb ?? addr.neighbourhood;
+  if (locality) parts.push(locality);
+  const settlement =
+    addr.city ?? addr.town ?? addr.village ?? addr.hamlet ?? addr.municipality;
+  if (settlement) parts.push(settlement);
+  if (addr.postcode) parts.push(addr.postcode);
+  // De-dupe (suburb and city sometimes collide for small settlements).
+  const unique = Array.from(new Set(parts.filter(Boolean)));
+  return unique.length > 0 ? unique.join(', ') : null;
+}
+
 // Reverse geocoding to get location context
-export async function reverseGeocode(lat: number, lon: number): Promise<{city?: string, postcode?: string, country?: string}> {
+export async function reverseGeocode(lat: number, lon: number): Promise<GeocodeInfo> {
   try {
     await nominatimRateLimiter.waitForNextRequest();
-    
+
     const headers = await getNominatimHeaders();
-    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=16&addressdetails=1`, { headers });
-    
+    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`, { headers });
+
     if (!response.ok) {
       if (response.status === 429) {
         throw new Error('Rate limited by Nominatim');
       }
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-    
+
     const contentType = response.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
       const text = await response.text();
       throw new Error(`Expected JSON but got ${contentType}: ${text.substring(0, 100)}`);
     }
-    
+
     const data = await response.json();
-    
+
     if (data && data.address) {
-      const addr = data.address;
+      const addr = data.address as NominatimAddressFields;
+      const formattedAddress = formatStructuredAddress(addr) ?? undefined;
       return {
-        city: addr.city || addr.town || addr.village || addr.municipality,
+        formattedAddress,
+        city: addr.city ?? addr.town ?? addr.village ?? addr.municipality,
         postcode: addr.postcode,
-        country: addr.country
+        country: addr.country,
       };
     }
   } catch (error) {
@@ -108,67 +163,84 @@ export async function reverseGeocode(lat: number, lon: number): Promise<{city?: 
   return {};
 }
 
-// Enhanced function to add geocoding information to places
+// Enhanced function to add geocoding information to places. Persists the
+// enhanced description back to the database when the place has an id and the
+// description actually changed, so subsequent renders (e.g. on the Places
+// page, which doesn't re-run reverse geocoding) reflect the upgrade.
 export async function enhancePlacesWithGeocode(places: any[]): Promise<any[]> {
   console.log(`Enhancing ${places.length} places with reverse geocoding...`);
-  
+
   const enhancedPlaces = [];
-  
+
   for (const place of places) {
     try {
-      // Get additional location context via reverse geocoding
       const geoInfo = await reverseGeocode(place.latitude, place.longitude);
-      
-      // Enhance the description with geocoding data
       const enhancedDescription = enhanceDescriptionWithGeocode(place.description, geoInfo);
-      
+
+      if (
+        place.id !== undefined &&
+        place.id !== null &&
+        enhancedDescription !== place.description
+      ) {
+        try {
+          await prisma.place.update({
+            where: { id: place.id },
+            data: { description: enhancedDescription },
+          });
+        } catch (e) {
+          console.warn(`Failed to persist enhanced description for place ${place.id}:`, e);
+        }
+      }
+
       enhancedPlaces.push({
         ...place,
         description: enhancedDescription,
-        geocodeInfo: geoInfo // Also include raw geocode info for frontend
+        geocodeInfo: geoInfo,
       });
-      
+
     } catch (error) {
       console.error(`Failed to enhance place ${place.name}:`, error);
-      // Include the place without enhancement if geocoding fails
       enhancedPlaces.push(place);
     }
   }
-  
+
   return enhancedPlaces;
 }
 
-// Helper function to enhance existing description with geocode information
-function enhanceDescriptionWithGeocode(
-  currentDescription: string, 
-  geoInfo: {city?: string, postcode?: string, country?: string}
+// Build the 📍 string for a description from a geocode result. Prefers the
+// fully-formatted street address when Nominatim provided one, falling back to
+// "City, Postcode" when only coarse data is available.
+export function buildLocationString(geoInfo: GeocodeInfo): string | null {
+  if (geoInfo.formattedAddress) return geoInfo.formattedAddress;
+  const parts: string[] = [];
+  if (geoInfo.city) parts.push(geoInfo.city);
+  if (geoInfo.postcode) parts.push(geoInfo.postcode);
+  return parts.length > 0 ? parts.join(', ') : null;
+}
+
+// Helper function to enhance existing description with geocode information.
+// If geocoding produced a usable location, replaces any existing 📍 part with
+// the new (typically richer) value, or prepends one if none was present.
+export function enhanceDescriptionWithGeocode(
+  currentDescription: string | null | undefined,
+  geoInfo: GeocodeInfo
 ): string {
   const parts = currentDescription ? currentDescription.split(' • ') : [];
-  
-  // Check if we already have location information in the description
-  const locationPartIndex = parts.findIndex(part => part.startsWith('📍'));
-  
-  if (locationPartIndex !== -1 && geoInfo.postcode) {
-    // Location info exists, but check if we need to add postcode
-    const locationPart = parts[locationPartIndex];
-    const locationContent = locationPart.substring(2); // Remove "📍 " prefix
-    
-    // Check if postcode is already in the location part
-    if (!locationContent.includes(geoInfo.postcode)) {
-      // Add postcode to existing location info
-      const updatedLocationContent = `${locationContent}, ${geoInfo.postcode}`;
-      parts[locationPartIndex] = `📍 ${updatedLocationContent}`;
-    }
-  } else if (locationPartIndex === -1 && (geoInfo.city || geoInfo.postcode)) {
-    // No location info exists, add it
-    const locationParts = [];
-    if (geoInfo.city) locationParts.push(geoInfo.city);
-    if (geoInfo.postcode) locationParts.push(geoInfo.postcode);
-    
-    const locationString = `📍 ${locationParts.join(', ')}`;
-    parts.unshift(locationString); // Add at the beginning
+  const newLocation = buildLocationString(geoInfo);
+
+  if (!newLocation) {
+    return parts.join(' • ');
   }
-  
+
+  const locationPartIndex = parts.findIndex(part => part.startsWith('📍'));
+  const locationString = `📍 ${newLocation}`;
+
+  if (locationPartIndex !== -1) {
+    parts[locationPartIndex] = locationString;
+  } else {
+    parts.unshift(locationString);
+  }
+
   return parts.join(' • ');
 }
 
