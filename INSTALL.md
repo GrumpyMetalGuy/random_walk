@@ -47,11 +47,12 @@ npm run build && npm start
 
 ## Production Deployment
 
-1. There is no published pre-built image — clone the repository and build the image locally on your production server (or in CI), then reference it from `docker-compose.yml`:
+1. There is no published pre-built image — clone the repository and build the image locally on your production server (or in CI), then reference it from `docker-compose.yml`. The recommended build command is `npm run docker:build`, which reads the version from the root `package.json` and tags the image as both `random-walk:v<version>` and `random-walk:latest`:
 ```bash
 git clone https://github.com/GrumpyMetalGuy/random_walk.git
 cd random_walk
-docker build -t random-walk:latest .
+npm run docker:build       # produces random-walk:v1.1.0 and random-walk:latest
+# or, without Node installed: docker build -t random-walk:v1.1.0 -t random-walk:latest .
 ```
 
 ```yaml

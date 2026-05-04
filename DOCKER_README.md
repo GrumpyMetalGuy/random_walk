@@ -4,11 +4,21 @@ A containerized location discovery application that helps you find interesting p
 
 > **Note:** there is no published pre-built image. Build the image locally from the repository before running any of the commands below.
 >
+> The recommended way is the npm helper, which reads the version from the root `package.json` and tags the image as **both** `random-walk:v<version>` and `random-walk:latest` in one shot:
+>
 > ```bash
 > git clone https://github.com/GrumpyMetalGuy/random_walk.git
 > cd random_walk
-> docker build -t random-walk:latest .
+> npm run docker:build
 > ```
+>
+> If you'd rather not have Node installed, the equivalent raw command is:
+>
+> ```bash
+> docker build -t random-walk:v1.1.0 -t random-walk:latest .
+> ```
+>
+> A bare `docker build .` (or `docker compose build`) only produces a single `random-walk:latest` tag — no versioned tag, since plain `docker build` doesn't read `package.json`.
 
 ## Quick Start
 
