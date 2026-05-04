@@ -27,6 +27,7 @@ Random Walk is a secure web application that helps users discover and track inte
   - Plan and unplan visits
   - Mark places as visited/unvisited
   - **Free-text notes** on visited and ignored places, editable inline from the Places page
+  - **Search filter on the Places page** narrows visited and ignored entries by name, place type, description, or notes
   - **One-click address copy**: each suggestion's address is rendered as a clickable link that copies it to the clipboard for pasting into the user's preferred maps/sat-nav app
   - **Shared place visits** between all users
 

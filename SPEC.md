@@ -35,6 +35,7 @@ Random Walk is a secure web application that helps users discover and track inte
 - Mark places as visited/unvisited
 - Ignore/unignore places
 - **Per-place freeform notes** on visited and ignored entries (max 2000 characters), editable inline on the Places page; cleared by submitting an empty/whitespace-only value
+- **Search filter on the Places page** that narrows both the Visited and Ignored lists in-place. Case-insensitive substring match against the place name, raw + formatted locationType, description, and notes; whitespace-only queries match everything. Empty-state copy switches to "No matches" when a query is active.
 - **Copyable address link**: each suggestion's address is rendered as a clickable element that copies the address (or coordinates as a fallback) to the clipboard, so users can paste into any maps/sat-nav app of their choice. The OSM link is preserved alongside it.
 - View place details including distance and description
 - **Shared place data** between all users

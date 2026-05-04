@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { parseDescription, extractAddress, formatCategoryName, generateOSMLink, formatDate } from '../utils';
+import { parseDescription, extractAddress, formatCategoryName, generateOSMLink, formatDate, placeMatchesQuery } from '../utils';
 import { AddressLink } from '../components/AddressLink';
 import axios from 'axios';
 
@@ -27,10 +27,12 @@ export function Places() {
   const [editingNotesId, setEditingNotesId] = useState<number | null>(null);
   const [notesDraft, setNotesDraft] = useState<string>('');
   const [savingNotes, setSavingNotes] = useState(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   useEffect(() => {
     fetchPlaces();
   }, []);
+
 
   const startEditNotes = (place: Place) => {
     setEditingNotesId(place.id);
@@ -215,8 +217,13 @@ export function Places() {
     }
   };
 
-  const visitedPlaces = places.filter(place => place.visitStatus === 'VISITED');
-  const ignoredPlaces = places.filter(place => place.visitStatus === 'IGNORED');
+  const hasQuery = searchQuery.trim().length > 0;
+  const visitedPlaces = places.filter(
+    place => place.visitStatus === 'VISITED' && placeMatchesQuery(place, searchQuery)
+  );
+  const ignoredPlaces = places.filter(
+    place => place.visitStatus === 'IGNORED' && placeMatchesQuery(place, searchQuery)
+  );
 
   if (loading) {
     return (
@@ -235,6 +242,32 @@ export function Places() {
           </div>
         </div>
       )}
+
+      {/* Search filter */}
+      <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-4">
+        <label htmlFor="places-search" className="block text-sm font-medium mb-2">
+          Search visited and ignored places
+        </label>
+        <div className="flex items-center gap-2">
+          <input
+            id="places-search"
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Filter by name, type, description, or notes..."
+            className="input-primary w-full"
+          />
+          {hasQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="btn-secondary text-sm whitespace-nowrap"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* Visited Places */}
       <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
@@ -264,7 +297,7 @@ export function Places() {
           ))}
           {visitedPlaces.length === 0 && (
             <p className="text-gray-500 dark:text-gray-400 text-center py-4">
-              No visited places yet
+              {hasQuery ? 'No visited places match your search' : 'No visited places yet'}
             </p>
           )}
         </div>
@@ -298,7 +331,7 @@ export function Places() {
           ))}
           {ignoredPlaces.length === 0 && (
             <p className="text-gray-500 dark:text-gray-400 text-center py-4">
-              No ignored places
+              {hasQuery ? 'No ignored places match your search' : 'No ignored places'}
             </p>
           )}
         </div>

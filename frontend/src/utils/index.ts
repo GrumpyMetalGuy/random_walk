@@ -75,6 +75,32 @@ export function extractPostcode(description: string | null): string | null {
 }
 
 /**
+ * Case-insensitive search predicate for the Places page filter. Matches the
+ * query against any descriptive text we hold for a place: name, raw and
+ * formatted locationType, description, and notes. Empty/whitespace queries
+ * match everything.
+ */
+export interface SearchablePlace {
+  name: string;
+  locationType: string;
+  description?: string | null;
+  notes?: string | null;
+}
+
+export function placeMatchesQuery(place: SearchablePlace, query: string): boolean {
+  if (!query.trim()) return true;
+  const q = query.toLowerCase();
+  const haystacks: (string | null | undefined)[] = [
+    place.name,
+    place.locationType,
+    formatCategoryName(place.locationType),
+    place.description,
+    place.notes,
+  ];
+  return haystacks.some(field => field?.toLowerCase().includes(q));
+}
+
+/**
  * Format category name for display
  */
 export function formatCategoryName(locationType: string): string {
