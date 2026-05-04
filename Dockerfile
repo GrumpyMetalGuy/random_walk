@@ -61,10 +61,11 @@ RUN npm install --omit=dev --legacy-peer-deps --unsafe-perm && npm cache clean -
 # Copy prisma directory first (needed for generate)
 COPY --from=backend-builder /app/backend/prisma ./prisma
 
-# Copy generated Prisma client and CLI from builder to avoid needing npx at runtime
-COPY --from=backend-builder /app/backend/node_modules/@prisma/client ./node_modules/@prisma/client
+# Production `npm install --omit=dev` already pulled in the full prisma
+# package and its transitive deps (prisma is a runtime dep — the app runs
+# `prisma migrate deploy` on startup), so we only need to bring in the
+# generated client output, which `prisma generate` produced in the builder.
 COPY --from=backend-builder /app/backend/node_modules/.prisma ./node_modules/.prisma
-COPY --from=backend-builder /app/backend/node_modules/prisma ./node_modules/prisma
 
 # Copy built application
 COPY --from=backend-builder /app/backend/dist ./dist
