@@ -1,6 +1,6 @@
 {
   "name": "random-walk",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A web application to discover and track random walks to interesting local places",
   "scripts": {
     "dev": "npm run build:frontend && cd backend && npm run dev",
@@ -15,17 +15,11 @@
     "lint": "npm run lint:frontend && npm run lint:backend",
     "lint:frontend": "cd frontend && npm run lint",
     "lint:backend": "cd backend && npm run lint",
-    "docker:build": "npm run docker:build:only",
-    "docker:build:only": "docker build -t yourusername/random-walk:v$(node -p require('./package.json').version) -t yourusername/random-walk:latest .",
-    "docker:push": "npm run docker:push:versioned && npm run docker:push:latest",
-    "docker:push:versioned": "docker push yourusername/random-walk:v$(node -p require('./package.json').version)",
-    "docker:push:latest": "docker push yourusername/random-walk:latest",
-    "docker:release": "npm run docker:build && npm run docker:push && npm run docker:update-compose",
-    "docker:update-compose": "sed -i.bak 's|image: yourusername/random-walk:.*|image: yourusername/random-walk:v'$(node -p require('./package.json').version)'|g' docker-compose.yml && rm -f docker-compose.yml.bak",
+    "docker:build": "docker build -t random-walk:v$(node -p \"require('./package.json').version\") -t random-walk:latest .",
     "version:sync": "npm run version:sync:frontend && npm run version:sync:backend",
-    "version:sync:frontend": "cd frontend && npm version $(node -p require('../package.json').version) --no-git-tag-version",
-    "version:sync:backend": "cd backend && npm version $(node -p require('../package.json').version) --no-git-tag-version",
-    "release": "npm run version:sync && npm run docker:release && git add . && git commit -m 'Release v'$(node -p require('./package.json').version) && git tag v$(node -p require('./package.json').version)"
+    "version:sync:frontend": "cd frontend && npm version $(node -p \"require('../package.json').version\") --no-git-tag-version",
+    "version:sync:backend": "cd backend && npm version $(node -p \"require('../package.json').version\") --no-git-tag-version",
+    "release": "npm run version:sync && npm run docker:build && git add . && git commit -m \"Release v$(node -p \"require('./package.json').version\")\" && git tag \"v$(node -p \"require('./package.json').version\")\""
   },
   "keywords": [
     "places",

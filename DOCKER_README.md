@@ -2,15 +2,23 @@
 
 A containerized location discovery application that helps you find interesting places within walking distance.
 
+> **Note:** there is no published pre-built image. Build the image locally from the repository before running any of the commands below.
+>
+> ```bash
+> git clone https://github.com/GrumpyMetalGuy/random_walk.git
+> cd random_walk
+> docker build -t random-walk:latest .
+> ```
+
 ## Quick Start
 
 ```bash
-# Just works - completely self-contained
+# Run the locally-built image
 docker run -d \
   --name random-walk \
   -p 4000:4000 \
   -v random-walk_data:/app/data \
-  yourusername/random-walk:latest
+  random-walk:latest
 ```
 
 ## Access the Application
@@ -31,10 +39,10 @@ docker-compose up -d
 
 Contents of `docker-compose.yml`:
 ```yaml
-version: '3.8'
 services:
   app:
-    image: yourusername/random-walk:v1.0.0  # Replace with your DockerHub username
+    build: .
+    image: random-walk:latest
     ports:
       - "4000:4000"
     volumes:
@@ -78,7 +86,7 @@ The application includes a health check endpoint at `/health` that returns `{"st
     -p 4000:4000 \
     -e JWT_SECRET="$(openssl rand -base64 64)" \
     -v random-walk_data:/app/data \
-    yourusername/random-walk:latest
+    random-walk:latest
   ```
 
   Kubernetes:

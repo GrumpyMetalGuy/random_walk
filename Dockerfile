@@ -6,26 +6,19 @@ WORKDIR /app
 # Copy frontend package files
 COPY frontend/package*.json ./frontend/
 WORKDIR /app/frontend
-# Install system esbuild and point node-esbuild to it to avoid binary exec issues
-RUN apt-get update && apt-get install -y --no-install-recommends esbuild && rm -rf /var/lib/apt/lists/*
-ENV ESBUILD_BINARY_PATH=/usr/bin/esbuild
-# Ensure npm lifecycle scripts run correctly as root (esbuild download/permissions)
+# npm installs the platform-specific esbuild binary into
+# node_modules/@esbuild/linux-x64/bin/esbuild. We don't pull in the OS-level
+# esbuild package — Debian's version drifts from whatever vite expects (host
+# 0.25.x vs binary 0.17.x is fatal) and a previous workaround that symlinked
+# the system binary in caused exactly that mismatch.
 RUN npm install --legacy-peer-deps --unsafe-perm && \
-  npm rebuild esbuild || true && \
-  # Fallback: fix esbuild binary execute permission if needed
-  (chmod +x node_modules/@esbuild/linux-x64/bin/esbuild 2>/dev/null || true) && \
-  (chmod +x node_modules/esbuild-linux-64/bin/esbuild 2>/dev/null || true) && \
-  (find node_modules/@esbuild -type f -name esbuild -exec chmod +x {} + 2>/dev/null || true) && \
-  # Force esbuild to use system binary via symlink if present
-  (ln -sf /usr/bin/esbuild node_modules/@esbuild/linux-x64/bin/esbuild 2>/dev/null || true) && \
-  (ln -sf /usr/bin/esbuild node_modules/esbuild-linux-64/bin/esbuild 2>/dev/null || true)
+  (find node_modules/@esbuild -type f -name esbuild -exec chmod +x {} + 2>/dev/null || true)
 
 # Copy frontend source
 COPY frontend/ ./
 
 # Build frontend (outputs to ../backend/public due to vite.config.ts)
 RUN set -eux; \
-  (find node_modules/@esbuild -maxdepth 3 -type f -name esbuild -exec chmod +x {} + 2>/dev/null || true); \
   node ./node_modules/typescript/bin/tsc; \
   node ./node_modules/vite/bin/vite.js build
 

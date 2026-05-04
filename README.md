@@ -192,6 +192,16 @@ cd backend && npx prisma migrate dev --name your-migration-name
 - **Theme Indicator**: A small blue dot appears on the theme toggle when following system preferences
 - **Theme Reset**: Double-click the theme toggle to reset back to system preference if you've manually changed it
 
+## Versioning
+
+Random Walk uses [semantic versioning](https://semver.org). The single source of truth is the `version` field in the **root** `package.json`; the workspace package.json files (`frontend/`, `backend/`) mirror it.
+
+- `npm run version:sync` propagates the root version into both workspaces (no git tag).
+- `npm run docker:build` builds the image and tags it as both `random-walk:v<version>` and `random-walk:latest`.
+- `npm run release` syncs versions, builds the image (with both tags), creates a release commit, and adds a `vX.Y.Z` git tag in one step.
+
+There is no published Docker image — builds are local. Bump the root `version` before running `release` to cut a new version.
+
 ## Production Deployment
 
 For production deployment instructions and configuration, please refer to [INSTALL.md](INSTALL.md).

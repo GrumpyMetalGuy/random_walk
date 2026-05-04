@@ -47,13 +47,18 @@ npm run build && npm start
 
 ## Production Deployment
 
-1. Create a `docker-compose.yml` file on your production server:
-```yaml
-version: '3.8'
+1. There is no published pre-built image — clone the repository and build the image locally on your production server (or in CI), then reference it from `docker-compose.yml`:
+```bash
+git clone https://github.com/GrumpyMetalGuy/random_walk.git
+cd random_walk
+docker build -t random-walk:latest .
+```
 
+```yaml
 services:
   app:
-    image: yourusername/random-walk:v1.0.0  # Replace with actual DockerHub username
+    build: .
+    image: random-walk:latest
     ports:
       - "4000:4000"
     volumes:
@@ -232,7 +237,7 @@ JWT_SECRET=$(openssl rand -base64 64)
 docker run -d -p 4000:4000 \
   -e JWT_SECRET="$(openssl rand -base64 64)" \
   -v random-walk_data:/app/data \
-  yourusername/random-walk:latest
+  random-walk:latest
 ```
 
 3) Kubernetes (example)
