@@ -28,11 +28,11 @@ export function Layout() {
           <div className="flex justify-between h-16">
             <div className="flex">
               <Link to="/" className="flex items-center">
-                <span className="text-xl font-bold text-primary-600 dark:text-primary-400">
+                <span className="text-lg sm:text-xl font-bold text-primary-600 dark:text-primary-400">
                   Random Walk
                 </span>
               </Link>
-              <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+              <div className="ml-3 flex space-x-3 sm:ml-6 sm:space-x-8">
                 <Link
                   to="/"
                   className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 dark:text-gray-100"
@@ -58,7 +58,7 @@ export function Layout() {
             <div className="flex items-center space-x-4">
               {user && (
                 <div className="flex items-center space-x-3">
-                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                  <span className="hidden sm:inline-flex items-center text-sm text-gray-700 dark:text-gray-300">
                     Welcome, {user.username}
                     {user.role === 'ADMIN' && (
                       <span className="ml-1 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
